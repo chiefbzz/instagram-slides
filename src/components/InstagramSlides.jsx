@@ -448,6 +448,21 @@ export default function InstagramSlides() {
         <Button onClick={generateSlides}>
           Generate Slides
         </Button>
+        <div className="mt-4 p-4 border rounded-lg bg-gray-50 text-sm text-gray-600">
+          <p className="font-semibold text-gray-700 mb-2">Formatting Reference</p>
+          <div className="grid grid-cols-2 gap-x-8 gap-y-1">
+            <div><code className="bg-gray-200 px-1 rounded">///</code> — slide break</div>
+            <div><code className="bg-gray-200 px-1 rounded">*text*</code> — <em>italic</em></div>
+            <div><code className="bg-gray-200 px-1 rounded">**text**</code> — <strong>bold</strong></div>
+            <div><code className="bg-gray-200 px-1 rounded">~text~</code> — <span style={{textDecoration: 'line-through'}}>strikethrough</span></div>
+            <div><code className="bg-gray-200 px-1 rounded">- text</code> — bullet point</div>
+            <div><code className="bg-gray-200 px-1 rounded">^^^</code> — extra vertical spacing</div>
+            <div><code className="bg-gray-200 px-1 rounded">{'{s}'}</code> — small text (70%)</div>
+            <div><code className="bg-gray-200 px-1 rounded">{'{l}'}</code> — large text (130%)</div>
+            <div><code className="bg-gray-200 px-1 rounded">{'{x}'}</code> — extra large text (170%)</div>
+            <div>blank line — paragraph break</div>
+          </div>
+        </div>
       </div>
 
       {/* Slides Preview */}
