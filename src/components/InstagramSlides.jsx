@@ -5,45 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Maximize2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
-const DEFAULT_ESSAY = `Here's how one hosts a Ganjarama.
-
-Oh — you don't know that term? I'm sorry, I'm getting ahead of myself. It's simply ganja + rama. Or, more precisely, an *extravagance of weed.* We good?
-///
-Ok, so the recipe is as follows.
-///
-You purchase enough weed to knock out a moderately-sized horse. It's better if you know a dealer, because they'll have weed coming out their ears, and grabbing four or five ounces at a discount is no matter.
-///
-(Do not deal weed unless you are a medical professional. Then deal it from a storefront, to appear all legitimate and whatnot.)
-///
-With your cornucopia of weed, you begin by inviting thirty good friends over. Ok, ok, you got me there, you don't have thirty *good* friends you'd smoke weed with.
-///
-For each year post-college, your *good* friend group will shrink, as will those who smoke weed, until the Venn between the two looks like the arc of a waning crescent moon, or that sliver of almond you shake onto your salad. So, childishness aside — and for obvious reasons — giddy up: one should throw a Ganjarama before the brain has fully developed.
-///
-Now about that invitation. They say the journey is the actual destination, which means you should get stoned to the gills and start scrapbooking. Whip out your copy of *High Times* and cut out photos of sticky red-haired buds; and *Relix* for that pic of Hendrix, and then steal your girlfriend's *Vogue* to capture some quips you'll edit into classic stoner terms.
-///
-(Your illegitimate dealer still has to cover some costs, so charge $5 a head, just to, um, *weed out the seeds from the stems*)
-///
-Timing your Ganjarama is important. Late at night makes the most sense, because the whole thing is fun for about forty-five minutes. After that, attendees will get loopy and occasionally funny, but mostly you'll just feel slightly anxious and awkward and wonder if you should have just made a night of watching Letterman, or why a party guest was talking to a doorknob or, wait, did someone just turn the stove on?
-///
-How to begin a Ganjarama? Well, you roll a big fat bone, maybe the length of a baby's arm and the thickness of a fully grown eggplant. You'll need to be creative here, creating a frankenstein of licked bits of Zig-Zag rolling papers, until you have a half-bent elbow and you need two hands to cradle it like a newborn.
-///
-To start, you'll want to create some natural tension, so upon arrival, box your thirty-four friends (some folks will sneak in) into your house's entryway designed for no more than ten people. Pack 'em in tight, like sardines, nose to nose and butt to butt; then, light up that huge bone and pass it all around.
-///
-(If the cops arrive, just call it an art-project or an experiment you're running for your psychology class, something about mass delirium or psychological safety.)
-///
-Wait long enough for a few of the more claustrophobic type to start having mild panic attacks, and people are shrieking to let them in. Then, with a bit of flair, thrust open the double doors into the main living room, where you'll have laid out stations as if a corporate buffet of hedonism: an ounce of herb piled near a four-foot Graphix bong, a tray of oblong joints. Pipes. An apple cored to smoke from. A homemade vaporizer.
-///
-On windowsills you'll have bowls of dry cereal (fruit loops and golden grahams), and some carrot sticks and celery in the kitchen. Globes of water and beer. Eyes will redden, and the air will soon choke with smoke.
-///
-Some will ask you why so much weed in one room, which will require you to rescind their invitation upon the spot.
-///
-Some forewarnings: a Ganjarama is mainly for professionals. You'll inadvertently want to invite a few friends unprepared for such an undertaking. Maybe they smoke occasionally, but never like this, and so they step up to the plate with all sorts of bravado, *hoovering three bongs and hitting passed joints at the same time.*
-///
-These people will likely wig and tweak and look about bug-eyed and frightened and ask you to hold their hand but then will spill the bong onto someone's lap and ruin your couch. And if you were to throw a Ganjarama again, say the following year, you'd be required to ban them under the guise of *managing the vibes.*
-///
-Mostly, a Ganjarama is about the statement. About the nature of weed before it became so strong that one tiny hit lets you *touch the fingertips of insanity.* About Bob Marley singing *Trenchtown Rock* or the laws of #hemp4victory or the experimentation of whippet-bong-whippet.
-///
-All of which is to say, you should host a Ganjarama only if it speaks directly to your soul or, I suppose, if you're bored and have nothing better to do.`;
+const DEFAULT_ESSAY = '';
 
 export default function InstagramSlides() {
   const [showWatermark, setShowWatermark] = useState(true);
