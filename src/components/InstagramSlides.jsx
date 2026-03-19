@@ -33,15 +33,36 @@ export default function InstagramSlides() {
   const canvasRef = useRef(null);
 
   const fonts = [
-    'Courier New',
+    // Serif — literary, intimate
+    'Playfair Display',
+    'Lora',
+    'Merriweather',
+    'Libre Baskerville',
+    'EB Garamond',
+    'Crimson Text',
+    'Source Serif 4',
+    'Literata',
+    'Spectral',
+    'Cormorant Garamond',
+    'Bitter',
     'Georgia',
-    'Arial',
+    'Palatino',
     'Times New Roman',
+    // Sans-serif — clean, modern
+    'Inter',
+    'Raleway',
+    'Montserrat',
+    'Open Sans',
+    'Lato',
+    'DM Sans',
+    'Arial',
     'Helvetica',
     'Verdana',
-    'Bookman',
-    'Palatino',
-    'Garamond'
+    // Monospace — wry, observational
+    'Space Mono',
+    'IBM Plex Mono',
+    'JetBrains Mono',
+    'Courier New',
   ];
 
   const generateSlides = () => {
