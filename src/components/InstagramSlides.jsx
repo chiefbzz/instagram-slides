@@ -146,7 +146,7 @@ export default function InstagramSlides() {
     });
   };
 
-  const renderToCanvas = async (text, index) => {
+  const renderToCanvas = async (text, index, contentSlideCount) => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     const scale = styles.slideSpecific[index]?.scale || 1;
@@ -295,7 +295,7 @@ export default function InstagramSlides() {
       ctx.font = `${18 * scale}px ${styles.fontFamily}`;
       ctx.fillStyle = styles.colors.text;
       ctx.globalAlpha = 0.7;
-      const totalPages = totalPagesOverride !== null ? totalPagesOverride : slides.length;
+      const totalPages = totalPagesOverride !== null ? totalPagesOverride : contentSlideCount;
       ctx.fillText(`${index + 1} / ${totalPages}`, 540, 1040);
       ctx.globalAlpha = 1.0;
       ctx.textAlign = 'left';
@@ -318,16 +318,31 @@ export default function InstagramSlides() {
     return canvas.toDataURL('image/png');
   };
 
+  const renderBlankSlide = () => {
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, 1080, 1080);
+    const gradient = ctx.createLinearGradient(0, 0, 1080, 1080);
+    gradient.addColorStop(0, styles.colors.gradientStart);
+    gradient.addColorStop(0.5, styles.colors.gradientMiddle);
+    gradient.addColorStop(1, styles.colors.gradientEnd);
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 1080, 1080);
+    return canvas.toDataURL('image/png');
+  };
+
   const renderAllSlides = useCallback(async () => {
     if (slides.length === 0) {
       setSlideImages([]);
       return;
     }
+    const contentCount = slides.length;
     const images = [];
     for (let i = 0; i < slides.length; i++) {
-      const img = await renderToCanvas(slides[i], i);
+      const img = await renderToCanvas(slides[i], i, contentCount);
       images.push(img);
     }
+    images.push(renderBlankSlide());
     setSlideImages(images);
   }, [slides, styles, showWatermark, showPageNumbers, totalPagesOverride]);
 
@@ -498,7 +513,7 @@ export default function InstagramSlides() {
         <div className="mb-6 text-center">
           <Button onClick={downloadAll} className="text-base px-6 py-3">
             <Download className="w-5 h-5 mr-2" />
-            Download All {slideImages.length} Slides
+            Download All {slides.length} Slides + Blank
           </Button>
         </div>
       )}
@@ -563,6 +578,33 @@ export default function InstagramSlides() {
             </div>
           </div>
         ))}
+
+        {/* Blank Background Slide */}
+        {slideImages.length > slides.length && (
+          <div className="relative">
+            <div className="relative mx-auto" style={{ maxWidth: '600px' }}>
+              <img
+                src={slideImages[slides.length]}
+                alt="Blank background"
+                className="w-full h-auto rounded-lg"
+              />
+            </div>
+            <div className="mt-4 text-center space-x-3">
+              <p className="text-sm text-gray-500 mb-2">Blank Background</p>
+              <Button
+                onClick={() => {
+                  const link = document.createElement('a');
+                  link.download = 'slide-blank.png';
+                  link.href = slideImages[slides.length];
+                  link.click();
+                }}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Download Blank
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Preview Modal */}
