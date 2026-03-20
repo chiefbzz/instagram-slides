@@ -2,8 +2,9 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Maximize2, Download } from 'lucide-react';
+import { Maximize2, Download, Plus, X, FileText } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { jsPDF } from 'jspdf';
 
 const DEFAULT_ESSAY = '';
 
@@ -30,8 +31,10 @@ export default function InstagramSlides() {
   const [essay, setEssay] = useState(DEFAULT_ESSAY);
   const [slides, setSlides] = useState([]);
   const [slideImages, setSlideImages] = useState([]);
+  const [insertedImages, setInsertedImages] = useState({});
   const [preview, setPreview] = useState({ show: false, image: '' });
   const canvasRef = useRef(null);
+  const fileInputRefs = useRef({});
 
   const fonts = [
     'Arial',
@@ -363,6 +366,58 @@ export default function InstagramSlides() {
     });
   };
 
+  const handleImageInsert = (position, file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setInsertedImages(prev => ({
+        ...prev,
+        [position]: [...(prev[position] || []), e.target.result]
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeInsertedImage = (position, imageIndex) => {
+    setInsertedImages(prev => {
+      const updated = { ...prev };
+      updated[position] = updated[position].filter((_, i) => i !== imageIndex);
+      if (updated[position].length === 0) delete updated[position];
+      return updated;
+    });
+  };
+
+  const buildPdfPageOrder = () => {
+    const pages = [];
+    for (let i = 0; i < slides.length; i++) {
+      // Images inserted before this slide (position = index)
+      if (insertedImages[i]) {
+        insertedImages[i].forEach(img => pages.push(img));
+      }
+      // The slide itself
+      if (slideImages[i]) pages.push(slideImages[i]);
+    }
+    // Images after the last slide (position = slides.length)
+    if (insertedImages[slides.length]) {
+      insertedImages[slides.length].forEach(img => pages.push(img));
+    }
+    return pages;
+  };
+
+  const createPdf = async () => {
+    const pages = buildPdfPageOrder();
+    if (pages.length === 0) return;
+
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: [1080, 1080] });
+
+    for (let i = 0; i < pages.length; i++) {
+      if (i > 0) pdf.addPage([1080, 1080]);
+      pdf.addImage(pages[i], 'PNG', 0, 0, 1080, 1080);
+    }
+
+    pdf.save('slides.pdf');
+  };
+
   return (
     <div className="p-4 max-w-screen-xl mx-auto">
       <canvas ref={canvasRef} width={1080} height={1080} className="hidden" />
@@ -508,76 +563,153 @@ export default function InstagramSlides() {
         </div>
       </div>
 
-      {/* Download All */}
+      {/* Download All & PDF */}
       {slideImages.length > 0 && (
-        <div className="mb-6 text-center">
+        <div className="mb-6 text-center space-x-4">
           <Button onClick={downloadAll} className="text-base px-6 py-3">
             <Download className="w-5 h-5 mr-2" />
             Download All {slides.length} Slides + Blank
+          </Button>
+          <Button onClick={createPdf} className="text-base px-6 py-3">
+            <FileText className="w-5 h-5 mr-2" />
+            Create PDF {Object.keys(insertedImages).length > 0 ? '(with photos)' : ''}
           </Button>
         </div>
       )}
 
       {/* Slides Preview */}
-      <div className="grid grid-cols-1 gap-8">
+      <div className="grid grid-cols-1 gap-4">
         {slides.map((slide, index) => (
-          <div key={`slide-preview-${index}`} className="relative">
-            <div className="mb-4">
-              <select
-                value={styles.slideSpecific[index]?.scale || '1'}
-                onChange={e => {
-                  const newSlideSpecific = { ...styles.slideSpecific };
-                  newSlideSpecific[index] = { scale: e.target.value };
-                  setStyles({ ...styles, slideSpecific: newSlideSpecific });
-                }}
-                className="w-full p-2 border rounded"
-              >
-                <option value="0.8">Small (80%)</option>
-                <option value="0.9">Medium (90%)</option>
-                <option value="1">Default (100%)</option>
-                <option value="1.1">Large (110%)</option>
-              </select>
-            </div>
-
-            <div className="relative mx-auto" style={{ maxWidth: '600px' }}>
-              {slideImages[index] ? (
-                <img
-                  src={slideImages[index]}
-                  alt={`Slide ${index + 1}`}
-                  className="w-full h-auto rounded-lg"
-                />
-              ) : (
-                <div className="w-full aspect-square bg-gray-200 rounded-lg flex items-center justify-center">
-                  Rendering...
+          <React.Fragment key={`slide-group-${index}`}>
+            {/* Insert image zone before this slide */}
+            <div className="flex flex-col items-center gap-2">
+              {(insertedImages[index] || []).map((img, imgIdx) => (
+                <div key={`inserted-${index}-${imgIdx}`} className="relative mx-auto" style={{ maxWidth: '600px' }}>
+                  <img src={img} alt={`Inserted before slide ${index + 1}`} className="w-full h-auto rounded-lg border-2 border-dashed border-blue-300" />
+                  <button
+                    onClick={() => removeInsertedImage(index, imgIdx)}
+                    className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                  <p className="text-xs text-blue-500 text-center mt-1">Inserted photo (PDF only)</p>
                 </div>
-              )}
+              ))}
+              <div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  ref={el => fileInputRefs.current[`before-${index}`] = el}
+                  onChange={e => {
+                    handleImageInsert(index, e.target.files[0]);
+                    e.target.value = '';
+                  }}
+                />
+                <button
+                  onClick={() => fileInputRefs.current[`before-${index}`]?.click()}
+                  className="flex items-center gap-1 text-xs text-gray-400 hover:text-blue-500 border border-dashed border-gray-300 hover:border-blue-400 rounded-full px-3 py-1 transition-colors"
+                >
+                  <Plus className="w-3 h-3" /> Insert photo here
+                </button>
+              </div>
             </div>
 
-            <div className="mt-4 text-center space-x-3">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  if (slideImages[index]) {
-                    setPreview({ show: true, image: slideImages[index] });
-                  }
+            {/* The slide */}
+            <div className="relative">
+              <div className="mb-4">
+                <select
+                  value={styles.slideSpecific[index]?.scale || '1'}
+                  onChange={e => {
+                    const newSlideSpecific = { ...styles.slideSpecific };
+                    newSlideSpecific[index] = { scale: e.target.value };
+                    setStyles({ ...styles, slideSpecific: newSlideSpecific });
+                  }}
+                  className="w-full p-2 border rounded"
+                >
+                  <option value="0.8">Small (80%)</option>
+                  <option value="0.9">Medium (90%)</option>
+                  <option value="1">Default (100%)</option>
+                  <option value="1.1">Large (110%)</option>
+                </select>
+              </div>
+
+              <div className="relative mx-auto" style={{ maxWidth: '600px' }}>
+                {slideImages[index] ? (
+                  <img
+                    src={slideImages[index]}
+                    alt={`Slide ${index + 1}`}
+                    className="w-full h-auto rounded-lg"
+                  />
+                ) : (
+                  <div className="w-full aspect-square bg-gray-200 rounded-lg flex items-center justify-center">
+                    Rendering...
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-4 text-center space-x-3">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    if (slideImages[index]) {
+                      setPreview({ show: true, image: slideImages[index] });
+                    }
+                  }}
+                >
+                  <Maximize2 className="w-4 h-4 mr-2" />
+                  Full Size
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (slideImages[index]) {
+                      downloadSlide(slideImages[index], index);
+                    }
+                  }}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Download Slide {index + 1}
+                </Button>
+              </div>
+            </div>
+          </React.Fragment>
+        ))}
+
+        {/* Insert image zone after last slide */}
+        {slides.length > 0 && (
+          <div className="flex flex-col items-center gap-2">
+            {(insertedImages[slides.length] || []).map((img, imgIdx) => (
+              <div key={`inserted-end-${imgIdx}`} className="relative mx-auto" style={{ maxWidth: '600px' }}>
+                <img src={img} alt="Inserted after last slide" className="w-full h-auto rounded-lg border-2 border-dashed border-blue-300" />
+                <button
+                  onClick={() => removeInsertedImage(slides.length, imgIdx)}
+                  className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+                <p className="text-xs text-blue-500 text-center mt-1">Inserted photo (PDF only)</p>
+              </div>
+            ))}
+            <div>
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                ref={el => fileInputRefs.current[`after-last`] = el}
+                onChange={e => {
+                  handleImageInsert(slides.length, e.target.files[0]);
+                  e.target.value = '';
                 }}
+              />
+              <button
+                onClick={() => fileInputRefs.current[`after-last`]?.click()}
+                className="flex items-center gap-1 text-xs text-gray-400 hover:text-blue-500 border border-dashed border-gray-300 hover:border-blue-400 rounded-full px-3 py-1 transition-colors"
               >
-                <Maximize2 className="w-4 h-4 mr-2" />
-                Full Size
-              </Button>
-              <Button
-                onClick={() => {
-                  if (slideImages[index]) {
-                    downloadSlide(slideImages[index], index);
-                  }
-                }}
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Download Slide {index + 1}
-              </Button>
+                <Plus className="w-3 h-3" /> Insert photo here
+              </button>
             </div>
           </div>
-        ))}
+        )}
 
         {/* Blank Background Slide */}
         {slideImages.length > slides.length && (
