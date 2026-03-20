@@ -13,10 +13,10 @@ export default function InstagramSlides() {
   const [totalPagesOverride, setTotalPagesOverride] = useState(null);
   const [styles, setStyles] = useState({
     colors: {
-      gradientStart: '#DABD7E',
-      gradientMiddle: '#F5EBD2',
-      gradientEnd: '#B26E2A',
-      text: '#3E2B1C'
+      gradientStart: '#1A1A2E',
+      gradientMiddle: '#1A1A2E',
+      gradientEnd: '#1A1A2E',
+      text: '#E8E8E8'
     },
     fontFamily: 'Courier New',
     fontSize: {
