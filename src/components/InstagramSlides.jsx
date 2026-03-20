@@ -1,8 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Maximize2 } from 'lucide-react';
+import { Maximize2, Download } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 const DEFAULT_ESSAY = '';
@@ -29,6 +29,7 @@ export default function InstagramSlides() {
 
   const [essay, setEssay] = useState(DEFAULT_ESSAY);
   const [slides, setSlides] = useState([]);
+  const [slideImages, setSlideImages] = useState([]);
   const [preview, setPreview] = useState({ show: false, image: '' });
   const canvasRef = useRef(null);
 
@@ -320,6 +321,36 @@ export default function InstagramSlides() {
     return canvas.toDataURL('image/png');
   };
 
+  const renderAllSlides = useCallback(async () => {
+    if (slides.length === 0) {
+      setSlideImages([]);
+      return;
+    }
+    const images = [];
+    for (let i = 0; i < slides.length; i++) {
+      const img = await renderToCanvas(slides[i], i);
+      images.push(img);
+    }
+    setSlideImages(images);
+  }, [slides, styles, showWatermark, showPageNumbers, totalPagesOverride]);
+
+  useEffect(() => {
+    renderAllSlides();
+  }, [renderAllSlides]);
+
+  const downloadSlide = (dataUrl, index) => {
+    const link = document.createElement('a');
+    link.download = `slide-${String(index + 1).padStart(2, '0')}.png`;
+    link.href = dataUrl;
+    link.click();
+  };
+
+  const downloadAll = () => {
+    slideImages.forEach((img, i) => {
+      setTimeout(() => downloadSlide(img, i), i * 200);
+    });
+  };
+
   return (
     <div className="p-4 max-w-screen-xl mx-auto">
       <canvas ref={canvasRef} width={1080} height={1080} className="hidden" />
@@ -465,6 +496,16 @@ export default function InstagramSlides() {
         </div>
       </div>
 
+      {/* Download All */}
+      {slideImages.length > 0 && (
+        <div className="mb-6 text-center">
+          <Button onClick={downloadAll} className="text-base px-6 py-3">
+            <Download className="w-5 h-5 mr-2" />
+            Download All {slideImages.length} Slides
+          </Button>
+        </div>
+      )}
+
       {/* Slides Preview */}
       <div className="grid grid-cols-1 gap-8">
         {slides.map((slide, index) => (
@@ -486,88 +527,41 @@ export default function InstagramSlides() {
               </select>
             </div>
 
-            <div className="relative mx-auto" style={{ width: '600px', height: '600px' }}>
-              <div
-                className="absolute inset-0 rounded-lg overflow-hidden"
-                style={{
-                  background: `linear-gradient(135deg, ${styles.colors.gradientStart} 0%, ${styles.colors.gradientMiddle} 50%, ${styles.colors.gradientEnd} 100%)`
-                }}
-              >
-                <div
-                  className="absolute inset-0 pt-32 px-12 pb-12 overflow-auto"
-                  style={{
-                    fontFamily: styles.fontFamily,
-                    color: styles.colors.text
-                  }}
-                >
-                  {(() => {
-                    const lines = slide.split('\n');
-                    const elements = [];
-                    let paragraphGroup = [];
-
-                    const addParagraphGroup = () => {
-                      if (paragraphGroup.length > 0) {
-                        elements.push(
-                          <div key={`group-${elements.length}`} className="mb-10">
-                            {paragraphGroup}
-                          </div>
-                        );
-                        paragraphGroup = [];
-                      }
-                    };
-
-                    lines.forEach((line, i) => {
-                      if (!line.trim()) {
-                        addParagraphGroup();
-                        return;
-                      }
-                      if (line.trim() === '^^^') {
-                        addParagraphGroup();
-                        elements.push(<div key={`spacer-${i}`} className="h-16"></div>);
-                        return;
-                      }
-
-                      const scale = styles.slideSpecific[index]?.scale || 1;
-                      const style = {
-                        fontSize: `${20 * scale}px`,
-                        fontWeight: 'normal',
-                        paddingLeft: line.startsWith('-') ? '1.5em' : '0',
-                        lineHeight: '1.6',
-                        marginBottom: line.startsWith('-') ? '10px' : '0px',
-                      };
-
-                      paragraphGroup.push(
-                        <p key={i} style={style}>
-                          {line.startsWith('-') && '• '}
-                          {processText(line.replace(/^-\s*/, ''))}
-                        </p>
-                      );
-                    });
-
-                    addParagraphGroup();
-
-                    return elements;
-                  })()}
-
-                  {showPageNumbers && (
-                    <div className="absolute bottom-8 left-0 right-0 text-center text-sm opacity-70">
-                      {index + 1} / {totalPagesOverride !== null ? totalPagesOverride : slides.length}
-                    </div>
-                  )}
+            <div className="relative mx-auto" style={{ maxWidth: '600px' }}>
+              {slideImages[index] ? (
+                <img
+                  src={slideImages[index]}
+                  alt={`Slide ${index + 1}`}
+                  className="w-full h-auto rounded-lg"
+                />
+              ) : (
+                <div className="w-full aspect-square bg-gray-200 rounded-lg flex items-center justify-center">
+                  Rendering...
                 </div>
-              </div>
+              )}
             </div>
 
-            <div className="mt-4 text-center">
+            <div className="mt-4 text-center space-x-3">
               <Button
                 variant="outline"
-                onClick={async () => {
-                  const image = await renderToCanvas(slide, index);
-                  setPreview({ show: true, image });
+                onClick={() => {
+                  if (slideImages[index]) {
+                    setPreview({ show: true, image: slideImages[index] });
+                  }
                 }}
               >
                 <Maximize2 className="w-4 h-4 mr-2" />
-                Preview Slide {index + 1}
+                Full Size
+              </Button>
+              <Button
+                onClick={() => {
+                  if (slideImages[index]) {
+                    downloadSlide(slideImages[index], index);
+                  }
+                }}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Download Slide {index + 1}
               </Button>
             </div>
           </div>
