@@ -39,6 +39,8 @@ export default function InstagramSlides() {
   const [showLinkedinSection, setShowLinkedinSection] = useState(false);
   const [generatedPrompt, setGeneratedPrompt] = useState('');
   const [promptCopied, setPromptCopied] = useState(false);
+  const [showPlainText, setShowPlainText] = useState(false);
+  const [plainTextCopied, setPlainTextCopied] = useState(false);
   const canvasRef = useRef(null);
   const fileInputRefs = useRef({});
 
@@ -140,6 +142,26 @@ export default function InstagramSlides() {
       setLinkedinStatus('error');
       console.error('LinkedIn post error:', err);
     }
+  };
+
+  const stripMarkdown = (text) => {
+    return text
+      .replace(/\*\*([^*]+)\*\*/g, '$1')  // **bold**
+      .replace(/\*([^*]+)\*/g, '$1')       // *italic*
+      .replace(/~([^~]+)~/g, '$1')         // ~strike~
+      .replace(/\{[slx]\}/g, '')           // {s} {l} {x}
+      .replace(/\^\^\^/g, '')              // ^^^
+      .replace(/\/\/\//g, '\n\n')          // /// → paragraph break
+      .replace(/\n{3,}/g, '\n\n')          // collapse extra newlines
+      .trim();
+  };
+
+  const getPlainText = () => stripMarkdown(essay);
+
+  const copyPlainText = () => {
+    navigator.clipboard.writeText(getPlainText());
+    setPlainTextCopied(true);
+    setTimeout(() => setPlainTextCopied(false), 2000);
   };
 
   const generateLinkedinPrompt = () => {
@@ -702,12 +724,45 @@ ${slideText}`;
 
       {/* Text Input */}
       <div className="mb-8">
-        <Textarea
-          value={essay}
-          onChange={e => setEssay(e.target.value)}
-          className="w-full h-64 mb-4"
-          placeholder="Paste your essay here. Use /// to separate slides. Use - for bullets. Font formatting: *italic*, **bold**, ~strikethrough~, {s} small, {l} large, {x} extra large. Add ^^^ line for extra spacing."
-        />
+        <div className="flex items-center gap-3 mb-2">
+          <Button
+            variant={showPlainText ? 'outline' : 'default'}
+            size="sm"
+            onClick={() => setShowPlainText(false)}
+          >
+            Markdown
+          </Button>
+          <Button
+            variant={showPlainText ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setShowPlainText(true)}
+          >
+            Plain Text
+          </Button>
+          {showPlainText && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={copyPlainText}
+            >
+              {plainTextCopied ? (
+                <><Check className="w-3 h-3 mr-1" />Copied</>
+              ) : (
+                <><Copy className="w-3 h-3 mr-1" />Copy Plain Text</>
+              )}
+            </Button>
+          )}
+        </div>
+        {showPlainText ? (
+          <pre className="w-full h-64 mb-4 p-3 border rounded-md bg-gray-50 overflow-auto whitespace-pre-wrap text-sm">{getPlainText()}</pre>
+        ) : (
+          <Textarea
+            value={essay}
+            onChange={e => setEssay(e.target.value)}
+            className="w-full h-64 mb-4"
+            placeholder="Paste your essay here. Use /// to separate slides. Use - for bullets. Font formatting: *italic*, **bold**, ~strikethrough~, {s} small, {l} large, {x} extra large. Add ^^^ line for extra spacing."
+          />
+        )}
         <Button onClick={generateSlides}>
           Generate Slides
         </Button>
