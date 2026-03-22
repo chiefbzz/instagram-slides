@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Maximize2, Download, Plus, X, FileText, Linkedin, Send, Loader2 } from 'lucide-react';
+import { Maximize2, Download, Plus, X, FileText, Linkedin, Send, Loader2, Copy, Check } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { jsPDF } from 'jspdf';
 
@@ -37,6 +37,8 @@ export default function InstagramSlides() {
   const [linkedinPost, setLinkedinPost] = useState('');
   const [linkedinStatus, setLinkedinStatus] = useState(''); // '', 'posting', 'success', 'error'
   const [showLinkedinSection, setShowLinkedinSection] = useState(false);
+  const [generatedPrompt, setGeneratedPrompt] = useState('');
+  const [promptCopied, setPromptCopied] = useState(false);
   const canvasRef = useRef(null);
   const fileInputRefs = useRef({});
 
@@ -138,6 +140,32 @@ export default function InstagramSlides() {
       setLinkedinStatus('error');
       console.error('LinkedIn post error:', err);
     }
+  };
+
+  const generateLinkedinPrompt = () => {
+    const slideText = slides.join('\n\n---\n\n');
+    const prompt = `I'm posting a slide carousel on LinkedIn with the following content. Write me a LinkedIn post to accompany it.
+
+Rules:
+- 3-5 sentences, conversational, not corporate
+- Don't start with "I" — LinkedIn buries those posts
+- End with a question or invitation to engage
+- Match the tone of the writing — direct, warm, a little irreverent
+- No hashtags unless they feel natural
+- This is a personal essay/story, not thought leadership
+
+Here's the slide content:
+
+${slideText}`;
+
+    setGeneratedPrompt(prompt);
+    setPromptCopied(false);
+  };
+
+  const copyPrompt = () => {
+    navigator.clipboard.writeText(generatedPrompt);
+    setPromptCopied(true);
+    setTimeout(() => setPromptCopied(false), 2000);
   };
 
   const fonts = [
@@ -894,37 +922,68 @@ export default function InstagramSlides() {
             )}
           </div>
 
-          {linkedin.token && (
-            <>
-              <Textarea
-                value={linkedinPost}
-                onChange={e => setLinkedinPost(e.target.value)}
-                className="w-full h-32 mb-4"
-                placeholder="Write your LinkedIn post here, or paste AI-generated copy..."
-              />
+          {/* AI Prompt Generator */}
+          <div className="mb-4 p-4 border rounded-lg bg-white">
+            <p className="text-sm font-medium mb-2">Step 1: Generate a prompt, copy it, paste into Claude or ChatGPT</p>
+            <Button onClick={generateLinkedinPrompt} variant="outline" className="mb-3">
+              Generate LinkedIn Post Prompt
+            </Button>
 
-              <div className="flex gap-3">
+            {generatedPrompt && (
+              <div className="relative">
+                <pre className="text-xs bg-gray-100 p-3 rounded whitespace-pre-wrap max-h-48 overflow-auto">{generatedPrompt}</pre>
                 <Button
-                  onClick={postToLinkedin}
-                  disabled={!linkedinPost.trim() || linkedinStatus === 'posting'}
-                  className="bg-blue-600 hover:bg-blue-700"
+                  size="sm"
+                  onClick={copyPrompt}
+                  className="absolute top-2 right-2"
                 >
-                  {linkedinStatus === 'posting' ? (
-                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Posting...</>
+                  {promptCopied ? (
+                    <><Check className="w-3 h-3 mr-1" />Copied</>
                   ) : (
-                    <><Send className="w-4 h-4 mr-2" />Post to LinkedIn with PDF</>
+                    <><Copy className="w-3 h-3 mr-1" />Copy</>
                   )}
                 </Button>
               </div>
+            )}
+          </div>
 
-              {linkedinStatus === 'success' && (
-                <p className="mt-3 text-sm text-green-600">Posted to LinkedIn!</p>
-              )}
-              {linkedinStatus === 'error' && (
-                <p className="mt-3 text-sm text-red-600">Failed to post. Try reconnecting LinkedIn.</p>
-              )}
-            </>
-          )}
+          {/* Post composer */}
+          <div className="p-4 border rounded-lg bg-white">
+            <p className="text-sm font-medium mb-2">Step 2: Paste the AI result here, edit, then post</p>
+            <Textarea
+              value={linkedinPost}
+              onChange={e => setLinkedinPost(e.target.value)}
+              className="w-full h-32 mb-4"
+              placeholder="Paste the AI-generated post here, then edit to your liking..."
+            />
+
+            {linkedin.token ? (
+              <>
+                <div className="flex gap-3">
+                  <Button
+                    onClick={postToLinkedin}
+                    disabled={!linkedinPost.trim() || linkedinStatus === 'posting'}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    {linkedinStatus === 'posting' ? (
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Posting...</>
+                    ) : (
+                      <><Send className="w-4 h-4 mr-2" />Post to LinkedIn with PDF</>
+                    )}
+                  </Button>
+                </div>
+
+                {linkedinStatus === 'success' && (
+                  <p className="mt-3 text-sm text-green-600">Posted to LinkedIn!</p>
+                )}
+                {linkedinStatus === 'error' && (
+                  <p className="mt-3 text-sm text-red-600">Failed to post. Try reconnecting LinkedIn.</p>
+                )}
+              </>
+            ) : (
+              <p className="text-sm text-gray-500">Connect LinkedIn above to post directly, or just copy your text from here.</p>
+            )}
+          </div>
         </div>
       )}
 
