@@ -43,6 +43,36 @@ export default function InstagramSlides() {
     return `rgb(${r}, ${g}, ${b})`;
   };
 
+  const rgbToHex = (rgbStr) => {
+    const match = rgbStr.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+    if (!match) return null;
+    const r = parseInt(match[1]).toString(16).padStart(2, '0');
+    const g = parseInt(match[2]).toString(16).padStart(2, '0');
+    const b = parseInt(match[3]).toString(16).padStart(2, '0');
+    return `#${r}${g}${b}`;
+  };
+
+  const restoreSettings = (input) => {
+    const fontMatch = input.match(/Font:\s*([^|]+?)(?:\s{2}|\s*Top:)/);
+    const topMatch = input.match(/Top:\s*(rgb\(\d+,\s*\d+,\s*\d+\))/);
+    const midMatch = input.match(/Mid:\s*(rgb\(\d+,\s*\d+,\s*\d+\))/);
+    const botMatch = input.match(/Bot:\s*(rgb\(\d+,\s*\d+,\s*\d+\))/);
+    const textMatch = input.match(/Text:\s*(rgb\(\d+,\s*\d+,\s*\d+\))/);
+
+    if (topMatch && midMatch && botMatch && textMatch) {
+      setStyles(prev => ({
+        ...prev,
+        fontFamily: fontMatch ? fontMatch[1].trim() : prev.fontFamily,
+        colors: {
+          gradientStart: rgbToHex(topMatch[1]),
+          gradientMiddle: rgbToHex(midMatch[1]),
+          gradientEnd: rgbToHex(botMatch[1]),
+          text: rgbToHex(textMatch[1]),
+        }
+      }));
+    }
+  };
+
   const fonts = [
     'Arial',
     'Bitter',
@@ -559,6 +589,17 @@ export default function InstagramSlides() {
                 {hexToRgb(styles.colors.text)}
                 <span className="text-gray-400 ml-auto">click to copy</span>
               </div>
+              <input
+                type="text"
+                placeholder="Paste saved settings here to restore"
+                className="w-full mt-1 px-3 py-1.5 bg-white border rounded text-xs font-mono"
+                onPaste={e => {
+                  setTimeout(() => {
+                    restoreSettings(e.target.value);
+                    e.target.value = '';
+                  }, 0);
+                }}
+              />
             </div>
           </div>
         </div>
