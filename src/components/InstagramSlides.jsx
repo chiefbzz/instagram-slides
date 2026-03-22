@@ -36,6 +36,13 @@ export default function InstagramSlides() {
   const canvasRef = useRef(null);
   const fileInputRefs = useRef({});
 
+  const hexToRgb = (hex) => {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgb(${r}, ${g}, ${b})`;
+  };
+
   const fonts = [
     'Arial',
     'Bitter',
@@ -535,19 +542,19 @@ export default function InstagramSlides() {
               <div
                 className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded text-xs font-mono cursor-pointer hover:bg-gray-200 transition-colors"
                 onClick={() => {
-                  const text = `Top: ${styles.colors.gradientStart}  Mid: ${styles.colors.gradientMiddle}  Bot: ${styles.colors.gradientEnd}  Text: ${styles.colors.text}`;
+                  const text = `Top: ${hexToRgb(styles.colors.gradientStart)}  Mid: ${hexToRgb(styles.colors.gradientMiddle)}  Bot: ${hexToRgb(styles.colors.gradientEnd)}  Text: ${hexToRgb(styles.colors.text)}`;
                   navigator.clipboard.writeText(text);
                 }}
                 title="Click to copy"
               >
                 <span className="inline-block w-3 h-3 rounded-sm border" style={{ backgroundColor: styles.colors.gradientStart }}></span>
-                {styles.colors.gradientStart}
+                {hexToRgb(styles.colors.gradientStart)}
                 <span className="inline-block w-3 h-3 rounded-sm border" style={{ backgroundColor: styles.colors.gradientMiddle }}></span>
-                {styles.colors.gradientMiddle}
+                {hexToRgb(styles.colors.gradientMiddle)}
                 <span className="inline-block w-3 h-3 rounded-sm border" style={{ backgroundColor: styles.colors.gradientEnd }}></span>
-                {styles.colors.gradientEnd}
+                {hexToRgb(styles.colors.gradientEnd)}
                 <span className="inline-block w-3 h-3 rounded-sm border" style={{ backgroundColor: styles.colors.text }}></span>
-                {styles.colors.text}
+                {hexToRgb(styles.colors.text)}
                 <span className="text-gray-400 ml-auto">click to copy</span>
               </div>
             </div>
