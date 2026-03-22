@@ -531,6 +531,26 @@ export default function InstagramSlides() {
                 />
               </div>
             </div>
+            <div className="mt-2">
+              <div
+                className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded text-xs font-mono cursor-pointer hover:bg-gray-200 transition-colors"
+                onClick={() => {
+                  const text = `Top: ${styles.colors.gradientStart}  Mid: ${styles.colors.gradientMiddle}  Bot: ${styles.colors.gradientEnd}  Text: ${styles.colors.text}`;
+                  navigator.clipboard.writeText(text);
+                }}
+                title="Click to copy"
+              >
+                <span className="inline-block w-3 h-3 rounded-sm border" style={{ backgroundColor: styles.colors.gradientStart }}></span>
+                {styles.colors.gradientStart}
+                <span className="inline-block w-3 h-3 rounded-sm border" style={{ backgroundColor: styles.colors.gradientMiddle }}></span>
+                {styles.colors.gradientMiddle}
+                <span className="inline-block w-3 h-3 rounded-sm border" style={{ backgroundColor: styles.colors.gradientEnd }}></span>
+                {styles.colors.gradientEnd}
+                <span className="inline-block w-3 h-3 rounded-sm border" style={{ backgroundColor: styles.colors.text }}></span>
+                {styles.colors.text}
+                <span className="text-gray-400 ml-auto">click to copy</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
