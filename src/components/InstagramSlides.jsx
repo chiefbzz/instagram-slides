@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Maximize2, Download, Plus, X, FileText } from 'lucide-react';
+import { Maximize2, Download, Plus, X, FileText, Linkedin, Send, Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { jsPDF } from 'jspdf';
 
@@ -33,6 +33,10 @@ export default function InstagramSlides() {
   const [slideImages, setSlideImages] = useState([]);
   const [insertedImages, setInsertedImages] = useState({});
   const [preview, setPreview] = useState({ show: false, image: '' });
+  const [linkedin, setLinkedin] = useState({ token: null, name: '', sub: '' });
+  const [linkedinPost, setLinkedinPost] = useState('');
+  const [linkedinStatus, setLinkedinStatus] = useState(''); // '', 'posting', 'success', 'error'
+  const [showLinkedinSection, setShowLinkedinSection] = useState(false);
   const canvasRef = useRef(null);
   const fileInputRefs = useRef({});
 
@@ -70,6 +74,69 @@ export default function InstagramSlides() {
           text: rgbToHex(textMatch[1]),
         }
       }));
+    }
+  };
+
+  // Pick up LinkedIn auth token from redirect
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const linkedinParam = params.get('linkedin');
+    if (linkedinParam) {
+      const linkedinData = new URLSearchParams(linkedinParam);
+      setLinkedin({
+        token: linkedinData.get('token'),
+        name: linkedinData.get('name'),
+        sub: linkedinData.get('sub'),
+      });
+      // Clean URL
+      window.history.replaceState({}, '', '/');
+    }
+  }, []);
+
+  const connectLinkedin = () => {
+    window.location.href = '/api/linkedin/auth';
+  };
+
+  const postToLinkedin = async () => {
+    if (!linkedin.token || !linkedinPost.trim()) return;
+
+    setLinkedinStatus('posting');
+
+    try {
+      // Build PDF as base64
+      const pages = buildPdfPageOrder();
+      let pdfBase64 = null;
+
+      if (pages.length > 0) {
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: [1080, 1080] });
+        for (let i = 0; i < pages.length; i++) {
+          if (i > 0) pdf.addPage([1080, 1080]);
+          pdf.addImage(pages[i], 'PNG', 0, 0, 1080, 1080);
+        }
+        pdfBase64 = pdf.output('datauristring').split(',')[1];
+      }
+
+      const res = await fetch('/api/linkedin/post', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: linkedin.token,
+          authorUrn: linkedin.sub,
+          text: linkedinPost,
+          pdfBase64,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setLinkedinStatus('success');
+      } else {
+        setLinkedinStatus('error');
+        console.error('LinkedIn post error:', data);
+      }
+    } catch (err) {
+      setLinkedinStatus('error');
+      console.error('LinkedIn post error:', err);
     }
   };
 
@@ -808,6 +875,58 @@ export default function InstagramSlides() {
           </div>
         )}
       </div>
+
+      {/* LinkedIn Section */}
+      {slides.length > 0 && (
+        <div className="mt-8 p-6 border rounded-lg bg-gray-50">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <Linkedin className="w-5 h-5 text-blue-600" />
+              LinkedIn
+            </h3>
+            {!linkedin.token ? (
+              <Button onClick={connectLinkedin} className="bg-blue-600 hover:bg-blue-700">
+                <Linkedin className="w-4 h-4 mr-2" />
+                Connect LinkedIn
+              </Button>
+            ) : (
+              <span className="text-sm text-green-600">Connected as {linkedin.name}</span>
+            )}
+          </div>
+
+          {linkedin.token && (
+            <>
+              <Textarea
+                value={linkedinPost}
+                onChange={e => setLinkedinPost(e.target.value)}
+                className="w-full h-32 mb-4"
+                placeholder="Write your LinkedIn post here, or paste AI-generated copy..."
+              />
+
+              <div className="flex gap-3">
+                <Button
+                  onClick={postToLinkedin}
+                  disabled={!linkedinPost.trim() || linkedinStatus === 'posting'}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  {linkedinStatus === 'posting' ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Posting...</>
+                  ) : (
+                    <><Send className="w-4 h-4 mr-2" />Post to LinkedIn with PDF</>
+                  )}
+                </Button>
+              </div>
+
+              {linkedinStatus === 'success' && (
+                <p className="mt-3 text-sm text-green-600">Posted to LinkedIn!</p>
+              )}
+              {linkedinStatus === 'error' && (
+                <p className="mt-3 text-sm text-red-600">Failed to post. Try reconnecting LinkedIn.</p>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       {/* Preview Modal */}
       <Dialog open={preview.show} onOpenChange={show => setPreview({ ...preview, show })}>
