@@ -12,6 +12,7 @@ export default function InstagramSlides() {
   const isWatermarkRoute = window.location.pathname === '/watermark';
   const [showWatermark, setShowWatermark] = useState(isWatermarkRoute);
   const [showPageNumbers, setShowPageNumbers] = useState(true);
+  const [showMadeWith, setShowMadeWith] = useState(false);
   const [totalPagesOverride, setTotalPagesOverride] = useState(null);
   const [styles, setStyles] = useState({
     colors: {
@@ -473,6 +474,15 @@ ${slideText}`;
       ctx.globalAlpha = 1.0;
     }
 
+    if (showMadeWith) {
+      ctx.textAlign = 'center';
+      ctx.globalAlpha = 0.4;
+      ctx.font = `${18 * scale}px ${styles.fontFamily}`;
+      ctx.fillText('made with love at mystoryshelf.com', 540, 1055);
+      ctx.globalAlpha = 1.0;
+      ctx.textAlign = 'left';
+    }
+
     return canvas.toDataURL('image/png');
   };
 
@@ -502,7 +512,7 @@ ${slideText}`;
     }
     images.push(renderBlankSlide());
     setSlideImages(images);
-  }, [slides, styles, showWatermark, showPageNumbers, totalPagesOverride]);
+  }, [slides, styles, showWatermark, showPageNumbers, showMadeWith, totalPagesOverride]);
 
   useEffect(() => {
     renderAllSlides();
@@ -640,6 +650,18 @@ ${slideText}`;
                 </div>
               )}
             </div>
+          </div>
+
+          <div className="flex justify-between items-center">
+            <label className="text-sm">Made with love footer</label>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowMadeWith(prev => !prev)}
+              className="w-32"
+            >
+              {showMadeWith ? 'Hide' : 'Show'}
+            </Button>
           </div>
 
           <div>
