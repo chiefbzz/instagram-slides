@@ -12,7 +12,7 @@ export default function InstagramSlides() {
   const isWatermarkRoute = window.location.pathname === '/watermark';
   const [showWatermark, setShowWatermark] = useState(isWatermarkRoute);
   const [showPageNumbers, setShowPageNumbers] = useState(true);
-  const [showMadeWith, setShowMadeWith] = useState(false);
+  const [madeWithSlides, setMadeWithSlides] = useState({});
   const [totalPagesOverride, setTotalPagesOverride] = useState(null);
   const [styles, setStyles] = useState({
     colors: {
@@ -474,14 +474,12 @@ ${slideText}`;
       ctx.globalAlpha = 1.0;
     }
 
-    if (showMadeWith) {
-      ctx.textAlign = 'center';
-      ctx.globalAlpha = 0.4;
-      ctx.font = `${16 * scale}px ${styles.fontFamily}`;
-      const madeWithY = showPageNumbers ? 1065 : 1050;
-      ctx.fillText('made with love at mystoryshelf.com', 540, madeWithY);
-      ctx.globalAlpha = 1.0;
+    if (madeWithSlides[index]) {
       ctx.textAlign = 'left';
+      ctx.globalAlpha = 0.25;
+      ctx.font = `${14 * scale}px ${styles.fontFamily}`;
+      ctx.fillText('mystoryshelf.com', 50, 1050);
+      ctx.globalAlpha = 1.0;
     }
 
     return canvas.toDataURL('image/png');
@@ -513,7 +511,7 @@ ${slideText}`;
     }
     images.push(renderBlankSlide());
     setSlideImages(images);
-  }, [slides, styles, showWatermark, showPageNumbers, showMadeWith, totalPagesOverride]);
+  }, [slides, styles, showWatermark, showPageNumbers, madeWithSlides, totalPagesOverride]);
 
   useEffect(() => {
     renderAllSlides();
@@ -651,18 +649,6 @@ ${slideText}`;
                 </div>
               )}
             </div>
-          </div>
-
-          <div className="flex justify-between items-center">
-            <label className="text-sm">Made with love footer</label>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowMadeWith(prev => !prev)}
-              className="w-32"
-            >
-              {showMadeWith ? 'Hide' : 'Show'}
-            </Button>
           </div>
 
           <div>
@@ -921,6 +907,14 @@ ${slideText}`;
                 >
                   <Download className="w-4 h-4 mr-2" />
                   Download Slide {index + 1}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setMadeWithSlides(prev => ({...prev, [index]: !prev[index]}))}
+                  className={madeWithSlides[index] ? 'border-green-400 text-green-600' : ''}
+                >
+                  {madeWithSlides[index] ? '✓ mystoryshelf.com' : '+ mystoryshelf.com'}
                 </Button>
               </div>
             </div>
