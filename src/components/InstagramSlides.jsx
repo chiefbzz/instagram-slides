@@ -973,43 +973,17 @@ ${slideText}`;
         <div className="mt-8 p-5 border border-gray-200 rounded-xl bg-white shadow-sm">
           <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
             <Linkedin className="w-5 h-5 text-blue-600" />
-            LinkedIn Draft
+            Post to LinkedIn
           </h3>
+          <p className="text-sm mb-4" style={{color: '#8a8880'}}>Write your post copy, copy it, then open LinkedIn to paste and attach your PDF.</p>
 
-          {/* AI Prompt Generator */}
-          <div className="mb-4 p-4 border rounded-lg bg-gray-50">
-            <p className="text-sm font-medium mb-2">Step 1: Generate a prompt, copy it, paste into Claude or ChatGPT</p>
-            <Button onClick={generateLinkedinPrompt} variant="outline" className="mb-3">
-              Generate LinkedIn Post Prompt
-            </Button>
-
-            {generatedPrompt && (
-              <div className="relative">
-                <pre className="text-xs bg-gray-100 p-3 rounded whitespace-pre-wrap max-h-48 overflow-auto">{generatedPrompt}</pre>
-                <Button
-                  size="sm"
-                  onClick={copyPrompt}
-                  className="absolute top-2 right-2"
-                >
-                  {promptCopied ? (
-                    <><Check className="w-3 h-3 mr-1" />Copied</>
-                  ) : (
-                    <><Copy className="w-3 h-3 mr-1" />Copy</>
-                  )}
-                </Button>
-              </div>
-            )}
-          </div>
-
-          {/* Draft composer */}
-          <div className="p-4 border rounded-lg bg-gray-50">
-            <p className="text-sm font-medium mb-2">Step 2: Paste the AI result here, edit, then copy to LinkedIn</p>
-            <Textarea
-              value={linkedinPost}
-              onChange={e => setLinkedinPost(e.target.value)}
-              className="w-full h-32 mb-4"
-              placeholder="Paste the AI-generated post here, edit to your liking, then copy..."
-            />
+          <Textarea
+            value={linkedinPost}
+            onChange={e => setLinkedinPost(e.target.value)}
+            className="w-full h-32 mb-4"
+            placeholder="Write or paste your LinkedIn post copy here..."
+          />
+          <div className="flex gap-3">
             <Button
               onClick={() => {
                 navigator.clipboard.writeText(linkedinPost);
@@ -1022,8 +996,14 @@ ${slideText}`;
               {linkedinStatus === 'copied' ? (
                 <><Check className="w-4 h-4 mr-2" />Copied!</>
               ) : (
-                <><Copy className="w-4 h-4 mr-2" />Copy to clipboard</>
+                <><Copy className="w-4 h-4 mr-2" />Copy text</>
               )}
+            </Button>
+            <Button
+              onClick={() => window.open('https://www.linkedin.com/feed/?shareActive=true', '_blank')}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              <Linkedin className="w-4 h-4 mr-2" />Open LinkedIn
             </Button>
           </div>
         </div>
