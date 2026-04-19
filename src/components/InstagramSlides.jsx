@@ -971,11 +971,21 @@ ${slideText}`;
       {/* LinkedIn Section */}
       {slides.length > 0 && (
         <div className="mt-8 p-5 border border-gray-200 rounded-xl bg-white shadow-sm">
-          <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
-            <Linkedin className="w-5 h-5 text-blue-600" />
-            Post to LinkedIn
-          </h3>
-          <p className="text-sm mb-4" style={{color: '#8a8880'}}>Write your post copy, copy it, then open LinkedIn to paste and attach your PDF.</p>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <Linkedin className="w-5 h-5 text-blue-600" />
+              LinkedIn Draft
+            </h3>
+            {!linkedin.token ? (
+              <Button onClick={connectLinkedin} className="bg-blue-600 hover:bg-blue-700">
+                <Linkedin className="w-4 h-4 mr-2" />
+                Connect LinkedIn
+              </Button>
+            ) : (
+              <span className="text-sm text-green-600">Connected as {linkedin.name}</span>
+            )}
+          </div>
+          <p className="text-sm mb-4" style={{color: '#8a8880'}}>Write your post copy, then save as a draft to LinkedIn with your PDF attached. You'll review and publish from LinkedIn.</p>
 
           <Textarea
             value={linkedinPost}
@@ -984,28 +994,42 @@ ${slideText}`;
             placeholder="Write or paste your LinkedIn post copy here..."
           />
           <div className="flex gap-3">
-            <Button
-              onClick={() => {
-                navigator.clipboard.writeText(linkedinPost);
-                setLinkedinStatus('copied');
-                setTimeout(() => setLinkedinStatus(''), 2000);
-              }}
-              disabled={!linkedinPost.trim()}
-              variant="outline"
-            >
-              {linkedinStatus === 'copied' ? (
-                <><Check className="w-4 h-4 mr-2" />Copied!</>
-              ) : (
-                <><Copy className="w-4 h-4 mr-2" />Copy text</>
-              )}
-            </Button>
-            <Button
-              onClick={() => window.open('https://www.linkedin.com/feed/?shareActive=true', '_blank')}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              <Linkedin className="w-4 h-4 mr-2" />Open LinkedIn
-            </Button>
+            {linkedin.token ? (
+              <Button
+                onClick={postToLinkedin}
+                disabled={!linkedinPost.trim() || linkedinStatus === 'posting'}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                {linkedinStatus === 'posting' ? (
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving...</>
+                ) : (
+                  <><Send className="w-4 h-4 mr-2" />Save draft to LinkedIn</>
+                )}
+              </Button>
+            ) : (
+              <Button
+                onClick={() => {
+                  navigator.clipboard.writeText(linkedinPost);
+                  setLinkedinStatus('copied');
+                  setTimeout(() => setLinkedinStatus(''), 2000);
+                }}
+                disabled={!linkedinPost.trim()}
+                variant="outline"
+              >
+                {linkedinStatus === 'copied' ? (
+                  <><Check className="w-4 h-4 mr-2" />Copied!</>
+                ) : (
+                  <><Copy className="w-4 h-4 mr-2" />Copy text</>
+                )}
+              </Button>
+            )}
           </div>
+          {linkedinStatus === 'success' && (
+            <p className="mt-3 text-sm text-green-600">Draft saved! Open LinkedIn to review and publish.</p>
+          )}
+          {linkedinStatus === 'error' && (
+            <p className="mt-3 text-sm text-red-600">Failed to save draft. Try reconnecting LinkedIn.</p>
+          )}
         </div>
       )}
 

@@ -63,7 +63,7 @@ export default async function handler(req, res) {
     // Step 3: Create the post
     const postBody = {
       author: `urn:li:person:${authorUrn}`,
-      lifecycleState: 'PUBLISHED',
+      lifecycleState: 'DRAFT',
       specificContent: {
         'com.linkedin.ugc.ShareContent': {
           shareCommentary: { text },
