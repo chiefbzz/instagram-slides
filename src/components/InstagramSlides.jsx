@@ -477,8 +477,9 @@ ${slideText}`;
     if (showMadeWith) {
       ctx.textAlign = 'center';
       ctx.globalAlpha = 0.4;
-      ctx.font = `${18 * scale}px ${styles.fontFamily}`;
-      ctx.fillText('made with love at mystoryshelf.com', 540, 1055);
+      ctx.font = `${16 * scale}px ${styles.fontFamily}`;
+      const madeWithY = showPageNumbers ? 1065 : 1050;
+      ctx.fillText('made with love at mystoryshelf.com', 540, madeWithY);
       ctx.globalAlpha = 1.0;
       ctx.textAlign = 'left';
     }
