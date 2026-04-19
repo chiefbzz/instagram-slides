@@ -576,6 +576,12 @@ ${slideText}`;
     <div className="p-4 max-w-screen-xl mx-auto">
       <canvas ref={canvasRef} width={1080} height={1080} className="hidden" />
 
+      {/* Explainer */}
+      <div className="mb-6 text-center">
+        <h1 className="text-2xl font-bold mb-2">StoryShelf Slides</h1>
+        <p className="text-gray-600 max-w-2xl mx-auto">Turn your writing into beautiful carousel slides for Instagram and LinkedIn. Paste your text, style it, and export — no design tools needed.</p>
+      </div>
+
       {/* Style Controls */}
       <div className="mb-8 p-4 border rounded-lg bg-gray-50">
         <div className="grid grid-cols-1 gap-4">
