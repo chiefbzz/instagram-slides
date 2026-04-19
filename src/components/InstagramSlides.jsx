@@ -574,17 +574,17 @@ ${slideText}`;
   };
 
   return (
-    <div className="p-4 max-w-screen-xl mx-auto">
+    <div className="p-6 max-w-screen-xl mx-auto">
       <canvas ref={canvasRef} width={1080} height={1080} className="hidden" />
 
       {/* Explainer */}
-      <div className="mb-6 text-center">
-        <h1 className="text-2xl font-bold mb-2">StoryShelf Slides</h1>
-        <p className="text-gray-600 max-w-2xl mx-auto">Turn your writing into beautiful carousel slides for Instagram and LinkedIn. Paste your text, style it, and export — no design tools needed.</p>
+      <div className="mb-8 pt-4 text-center">
+        <h1 className="text-3xl font-semibold tracking-tight mb-2" style={{color: '#1a1916'}}>StoryShelf Slides</h1>
+        <p className="text-sm max-w-lg mx-auto" style={{color: '#8a8880'}}>Turn your writing into beautiful carousel slides for Instagram and LinkedIn. Paste your text, style it, and export — no design tools needed.</p>
       </div>
 
       {/* Style Controls */}
-      <div className="mb-8 p-4 border rounded-lg bg-gray-50">
+      <div className="mb-8 p-5 border border-gray-200 rounded-xl bg-white shadow-sm">
         <div className="grid grid-cols-1 gap-4">
           <div>
             <label className="block text-sm mb-1">Font</label>
