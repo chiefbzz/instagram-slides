@@ -9,7 +9,8 @@ import { jsPDF } from 'jspdf';
 const DEFAULT_ESSAY = '';
 
 export default function InstagramSlides() {
-  const [showWatermark, setShowWatermark] = useState(true);
+  const isWatermarkRoute = window.location.pathname === '/watermark';
+  const [showWatermark, setShowWatermark] = useState(isWatermarkRoute);
   const [showPageNumbers, setShowPageNumbers] = useState(true);
   const [totalPagesOverride, setTotalPagesOverride] = useState(null);
   const [styles, setStyles] = useState({
@@ -598,6 +599,7 @@ ${slideText}`;
             </select>
           </div>
 
+          {isWatermarkRoute && (
           <div className="flex justify-between items-center">
             <label className="text-sm">Watermark</label>
             <Button
@@ -609,6 +611,7 @@ ${slideText}`;
               {showWatermark ? 'Hide' : 'Show'}
             </Button>
           </div>
+          )}
 
           <div className="flex justify-between items-center">
             <label className="text-sm">Page Numbers</label>
