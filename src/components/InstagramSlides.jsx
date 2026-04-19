@@ -970,24 +970,14 @@ ${slideText}`;
 
       {/* LinkedIn Section */}
       {slides.length > 0 && (
-        <div className="mt-8 p-6 border rounded-lg bg-gray-50">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold flex items-center gap-2">
-              <Linkedin className="w-5 h-5 text-blue-600" />
-              LinkedIn
-            </h3>
-            {!linkedin.token ? (
-              <Button onClick={connectLinkedin} className="bg-blue-600 hover:bg-blue-700">
-                <Linkedin className="w-4 h-4 mr-2" />
-                Connect LinkedIn
-              </Button>
-            ) : (
-              <span className="text-sm text-green-600">Connected as {linkedin.name}</span>
-            )}
-          </div>
+        <div className="mt-8 p-5 border border-gray-200 rounded-xl bg-white shadow-sm">
+          <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
+            <Linkedin className="w-5 h-5 text-blue-600" />
+            LinkedIn Draft
+          </h3>
 
           {/* AI Prompt Generator */}
-          <div className="mb-4 p-4 border rounded-lg bg-white">
+          <div className="mb-4 p-4 border rounded-lg bg-gray-50">
             <p className="text-sm font-medium mb-2">Step 1: Generate a prompt, copy it, paste into Claude or ChatGPT</p>
             <Button onClick={generateLinkedinPrompt} variant="outline" className="mb-3">
               Generate LinkedIn Post Prompt
@@ -1011,42 +1001,30 @@ ${slideText}`;
             )}
           </div>
 
-          {/* Post composer */}
-          <div className="p-4 border rounded-lg bg-white">
-            <p className="text-sm font-medium mb-2">Step 2: Paste the AI result here, edit, then post</p>
+          {/* Draft composer */}
+          <div className="p-4 border rounded-lg bg-gray-50">
+            <p className="text-sm font-medium mb-2">Step 2: Paste the AI result here, edit, then copy to LinkedIn</p>
             <Textarea
               value={linkedinPost}
               onChange={e => setLinkedinPost(e.target.value)}
               className="w-full h-32 mb-4"
-              placeholder="Paste the AI-generated post here, then edit to your liking..."
+              placeholder="Paste the AI-generated post here, edit to your liking, then copy..."
             />
-
-            {linkedin.token ? (
-              <>
-                <div className="flex gap-3">
-                  <Button
-                    onClick={postToLinkedin}
-                    disabled={!linkedinPost.trim() || linkedinStatus === 'posting'}
-                    className="bg-blue-600 hover:bg-blue-700"
-                  >
-                    {linkedinStatus === 'posting' ? (
-                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Posting...</>
-                    ) : (
-                      <><Send className="w-4 h-4 mr-2" />Post to LinkedIn with PDF</>
-                    )}
-                  </Button>
-                </div>
-
-                {linkedinStatus === 'success' && (
-                  <p className="mt-3 text-sm text-green-600">Posted to LinkedIn!</p>
-                )}
-                {linkedinStatus === 'error' && (
-                  <p className="mt-3 text-sm text-red-600">Failed to post. Try reconnecting LinkedIn.</p>
-                )}
-              </>
-            ) : (
-              <p className="text-sm text-gray-500">Connect LinkedIn above to post directly, or just copy your text from here.</p>
-            )}
+            <Button
+              onClick={() => {
+                navigator.clipboard.writeText(linkedinPost);
+                setLinkedinStatus('copied');
+                setTimeout(() => setLinkedinStatus(''), 2000);
+              }}
+              disabled={!linkedinPost.trim()}
+              variant="outline"
+            >
+              {linkedinStatus === 'copied' ? (
+                <><Check className="w-4 h-4 mr-2" />Copied!</>
+              ) : (
+                <><Copy className="w-4 h-4 mr-2" />Copy to clipboard</>
+              )}
+            </Button>
           </div>
         </div>
       )}
