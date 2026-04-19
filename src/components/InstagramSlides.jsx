@@ -1033,6 +1033,30 @@ ${slideText}`;
         </div>
       )}
 
+      {/* Instagram Section */}
+      {slideImages.length > 0 && (
+        <div className="mt-4 p-5 border border-gray-200 rounded-xl bg-white shadow-sm">
+          <h3 className="text-lg font-semibold flex items-center gap-2 mb-2">
+            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="#E1306C" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="5"/><circle cx="17.5" cy="6.5" r="1.5" fill="#E1306C" stroke="none"/></svg>
+            Post to Instagram
+          </h3>
+          <p className="text-sm mb-4" style={{color: '#8a8880'}}>Download your slides, then open Instagram to create a carousel post.</p>
+          <div className="flex gap-3">
+            <Button onClick={downloadAll} variant="outline">
+              <Download className="w-4 h-4 mr-2" />
+              Download all slides
+            </Button>
+            <Button
+              onClick={() => window.open('https://www.instagram.com', '_blank')}
+              style={{background: '#E1306C', color: 'white'}}
+              className="hover:opacity-90"
+            >
+              Open Instagram
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Preview Modal */}
       <Dialog open={preview.show} onOpenChange={show => setPreview({ ...preview, show })}>
         <DialogContent className="max-w-4xl">
