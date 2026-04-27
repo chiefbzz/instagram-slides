@@ -30,6 +30,7 @@ export default function InstagramSlides() {
     slideSpecific: {}
   });
 
+  const [pieceTitle, setPieceTitle] = useState('');
   const [essay, setEssay] = useState(DEFAULT_ESSAY);
   const [slides, setSlides] = useState([]);
   const [slideImages, setSlideImages] = useState([]);
@@ -517,9 +518,12 @@ ${slideText}`;
     renderAllSlides();
   }, [renderAllSlides]);
 
+  const slugify = (text) => text.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
   const downloadSlide = (dataUrl, index) => {
     const link = document.createElement('a');
-    link.download = `slide-${String(index + 1).padStart(2, '0')}.png`;
+    const prefix = pieceTitle.trim() ? slugify(pieceTitle) : 'slide';
+    link.download = `${prefix}-${String(index + 1).padStart(2, '0')}.png`;
     link.href = dataUrl;
     link.click();
   };
@@ -579,7 +583,8 @@ ${slideText}`;
       pdf.addImage(pages[i], 'PNG', 0, 0, 1080, 1080);
     }
 
-    pdf.save('slides.pdf');
+    const pdfName = pieceTitle.trim() ? `${slugify(pieceTitle)}.pdf` : 'slides.pdf';
+    pdf.save(pdfName);
   };
 
   return (
@@ -738,6 +743,17 @@ ${slideText}`;
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Piece Title */}
+      <div className="mb-4">
+        <label className="block text-sm mb-1">Piece Title</label>
+        <Input
+          value={pieceTitle}
+          onChange={e => setPieceTitle(e.target.value)}
+          placeholder="e.g. The Pool Guy — used for download filenames"
+          className="max-w-md"
+        />
       </div>
 
       {/* Text Input */}
@@ -972,7 +988,8 @@ ${slideText}`;
               <Button
                 onClick={() => {
                   const link = document.createElement('a');
-                  link.download = 'slide-blank.png';
+                  const prefix = pieceTitle.trim() ? slugify(pieceTitle) : 'slide';
+                  link.download = `${prefix}-blank.png`;
                   link.href = slideImages[slides.length];
                   link.click();
                 }}
