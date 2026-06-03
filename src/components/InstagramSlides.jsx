@@ -309,19 +309,26 @@ ${slideText}`;
   const renderToCanvas = async (text, index, contentSlideCount) => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
-    const scale = styles.slideSpecific[index]?.scale || 1;
+    const slideOverrides = styles.slideSpecific[index] || {};
+    const scale = slideOverrides.scale || 1;
+    const slideColors = {
+      gradientStart: slideOverrides.colors?.gradientStart || styles.colors.gradientStart,
+      gradientMiddle: slideOverrides.colors?.gradientMiddle || styles.colors.gradientMiddle,
+      gradientEnd: slideOverrides.colors?.gradientEnd || styles.colors.gradientEnd,
+      text: slideOverrides.colors?.text || styles.colors.text,
+    };
 
     ctx.clearRect(0, 0, 1080, 1080);
     const gradient = ctx.createLinearGradient(0, 0, 1080, 1080);
-    gradient.addColorStop(0, styles.colors.gradientStart);
-    gradient.addColorStop(0.5, styles.colors.gradientMiddle);
-    gradient.addColorStop(1, styles.colors.gradientEnd);
+    gradient.addColorStop(0, slideColors.gradientStart);
+    gradient.addColorStop(0.5, slideColors.gradientMiddle);
+    gradient.addColorStop(1, slideColors.gradientEnd);
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, 1080, 1080);
 
     const renderLine = (line, x, y, fontSize) => {
       const scaledSize = fontSize * parseFloat(scale);
-      ctx.fillStyle = styles.colors.text;
+      ctx.fillStyle = slideColors.text;
       const maxWidth = 920;
       let currentY = y;
 
@@ -453,7 +460,7 @@ ${slideText}`;
     if (showPageNumbers) {
       ctx.textAlign = 'center';
       ctx.font = `${18 * scale}px ${styles.fontFamily}`;
-      ctx.fillStyle = styles.colors.text;
+      ctx.fillStyle = slideColors.text;
       ctx.globalAlpha = 0.7;
       const totalPages = totalPagesOverride !== null ? totalPagesOverride : contentSlideCount;
       ctx.fillText(`${index + 1} / ${totalPages}`, 540, 1040);
@@ -871,22 +878,89 @@ ${slideText}`;
 
             {/* The slide */}
             <div className="relative">
-              <div className="mb-4">
+              <div className="mb-4 flex items-center gap-3">
                 <select
                   value={styles.slideSpecific[index]?.scale || '1'}
                   onChange={e => {
                     const newSlideSpecific = { ...styles.slideSpecific };
-                    newSlideSpecific[index] = { scale: e.target.value };
+                    newSlideSpecific[index] = { ...newSlideSpecific[index], scale: e.target.value };
                     setStyles({ ...styles, slideSpecific: newSlideSpecific });
                   }}
-                  className="w-full p-2 border rounded"
+                  className="p-2 border rounded"
                 >
                   <option value="0.8">Small (80%)</option>
                   <option value="0.9">Medium (90%)</option>
                   <option value="1">Default (100%)</option>
                   <option value="1.1">Large (110%)</option>
                 </select>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const newSlideSpecific = { ...styles.slideSpecific };
+                    if (newSlideSpecific[index]?.colors) {
+                      const { colors, ...rest } = newSlideSpecific[index];
+                      newSlideSpecific[index] = rest;
+                    } else {
+                      newSlideSpecific[index] = {
+                        ...newSlideSpecific[index],
+                        colors: {
+                          gradientStart: styles.colors.gradientStart,
+                          gradientMiddle: styles.colors.gradientMiddle,
+                          gradientEnd: styles.colors.gradientEnd,
+                          text: styles.colors.text,
+                        }
+                      };
+                    }
+                    setStyles({ ...styles, slideSpecific: newSlideSpecific });
+                  }}
+                  className={styles.slideSpecific[index]?.colors ? 'border-blue-400 text-blue-600' : ''}
+                >
+                  {styles.slideSpecific[index]?.colors ? '✓ Custom Colors' : '+ Custom Colors'}
+                </Button>
+                {styles.slideSpecific[index]?.colors && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const newSlideSpecific = { ...styles.slideSpecific };
+                      const { colors, ...rest } = newSlideSpecific[index];
+                      newSlideSpecific[index] = rest;
+                      setStyles({ ...styles, slideSpecific: newSlideSpecific });
+                    }}
+                    className="text-red-500 border-red-300 hover:bg-red-50"
+                  >
+                    Reset
+                  </Button>
+                )}
               </div>
+              {styles.slideSpecific[index]?.colors && (
+                <div className="mb-4 grid grid-cols-4 gap-2">
+                  {[
+                    ['gradientStart', 'Top'],
+                    ['gradientMiddle', 'Mid'],
+                    ['gradientEnd', 'Bot'],
+                    ['text', 'Text'],
+                  ].map(([key, label]) => (
+                    <div key={key}>
+                      <label className="block text-xs mb-1">{label}</label>
+                      <Input
+                        type="color"
+                        value={styles.slideSpecific[index].colors[key]}
+                        onChange={e => {
+                          const newSlideSpecific = { ...styles.slideSpecific };
+                          newSlideSpecific[index] = {
+                            ...newSlideSpecific[index],
+                            colors: { ...newSlideSpecific[index].colors, [key]: e.target.value }
+                          };
+                          setStyles({ ...styles, slideSpecific: newSlideSpecific });
+                        }}
+                        className="h-8"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
 
               <div className="relative mx-auto" style={{ maxWidth: '600px' }}>
                 {slideImages[index] ? (
