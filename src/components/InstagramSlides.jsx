@@ -595,17 +595,23 @@ ${slideText}`;
   };
 
   return (
-    <div className="p-6 max-w-screen-xl mx-auto">
+    <div className="h-screen flex flex-col">
       <canvas ref={canvasRef} width={1080} height={1080} className="hidden" />
 
-      {/* Explainer */}
-      <div className="mb-8 pt-4 text-center">
-        <h1 className="text-3xl font-semibold tracking-tight mb-2" style={{color: '#1a1916'}}>StoryShelf Slides</h1>
-        <p className="text-sm max-w-lg mx-auto" style={{color: '#8a8880'}}>Turn your writing into beautiful carousel slides for Instagram and LinkedIn. Paste your text, style it, and export — no design tools needed.</p>
+      {/* Header */}
+      <div className="py-3 px-6 text-center border-b border-gray-200 shrink-0">
+        <h1 className="text-2xl font-semibold tracking-tight" style={{color: '#1a1916'}}>StoryShelf Slides</h1>
+        <p className="text-xs" style={{color: '#8a8880'}}>Turn your writing into beautiful carousel slides for Instagram and LinkedIn.</p>
       </div>
 
+      {/* Split Pane */}
+      <div className="flex flex-1 min-h-0">
+
+        {/* LEFT PANE — Editor & Controls */}
+        <div className="w-1/2 overflow-y-auto p-6 border-r border-gray-200">
+
       {/* Style Controls */}
-      <div className="mb-8 p-5 border border-gray-200 rounded-xl bg-white shadow-sm">
+      <div className="mb-6 p-5 border border-gray-200 rounded-xl bg-white shadow-sm">
         <div className="grid grid-cols-1 gap-4">
           <div>
             <label className="block text-sm mb-1">Font</label>
@@ -800,7 +806,7 @@ ${slideText}`;
           <Textarea
             value={essay}
             onChange={e => setEssay(e.target.value)}
-            className="w-full h-64 mb-4"
+            className="w-full h-80 mb-4"
             placeholder="Paste your essay here. Use /// to separate slides. Use - for bullets. Font formatting: *italic*, **bold**, ~strikethrough~, {s} small, {l} large, {x} extra large. Add ^^^ line for extra spacing."
           />
         )}
@@ -823,6 +829,11 @@ ${slideText}`;
           </div>
         </div>
       </div>
+
+        </div>{/* END LEFT PANE */}
+
+        {/* RIGHT PANE — Slides Preview */}
+        <div className="w-1/2 overflow-y-auto p-6">
 
       {/* Download All & PDF */}
       {slideImages.length > 0 && (
@@ -1164,6 +1175,10 @@ ${slideText}`;
           </div>
         </div>
       )}
+
+        </div>{/* END RIGHT PANE */}
+
+      </div>{/* END Split Pane */}
 
       {/* Preview Modal */}
       <Dialog open={preview.show} onOpenChange={show => setPreview({ ...preview, show })}>
