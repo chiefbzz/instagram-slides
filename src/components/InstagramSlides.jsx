@@ -153,6 +153,7 @@ export default function InstagramSlides() {
       .replace(/\*([^*]+)\*/g, '$1')       // *italic*
       .replace(/~([^~]+)~/g, '$1')         // ~strike~
       .replace(/\{[slx]\}/g, '')           // {s} {l} {x}
+      .replace(/^\s*>+\s?/gm, '')          // leading > indent markers
       .replace(/\^\^\^/g, '')              // ^^^
       .replace(/\/\/\//g, '\n\n')          // /// → paragraph break
       .replace(/\n{3,}/g, '\n\n')          // collapse extra newlines
@@ -329,7 +330,7 @@ ${slideText}`;
     const renderLine = (line, x, y, fontSize) => {
       const scaledSize = fontSize * parseFloat(scale);
       ctx.fillStyle = slideColors.text;
-      const maxWidth = 920;
+      const maxWidth = 1000 - x;
       let currentY = y;
 
       const segments = parseTextSegments(line);
@@ -430,18 +431,26 @@ ${slideText}`;
       }
 
       let fontSize, xPos;
-      const trimmedLine = lines[i].trim();
+      let trimmedLine = lines[i].trim();
+
+      // Leading '>' marks indentation; each '>' adds one indent level
+      let indentLevel = 0;
+      while (trimmedLine.startsWith('>')) {
+        indentLevel += 1;
+        trimmedLine = trimmedLine.slice(1).trim();
+      }
+      const indentOffset = indentLevel * 60;
 
       if (i === 0 && index === 0) {
         fontSize = styles.fontSize.normal;
-        xPos = 80;
+        xPos = 80 + indentOffset;
       } else if (trimmedLine.startsWith('-')) {
         fontSize = styles.fontSize.bullet;
-        xPos = 110;
-        ctx.fillText('•', 80, currentY);
+        xPos = 110 + indentOffset;
+        ctx.fillText('•', 80 + indentOffset, currentY);
       } else {
         fontSize = styles.fontSize.normal;
-        xPos = 80;
+        xPos = 80 + indentOffset;
       }
 
       const lineText = trimmedLine.startsWith('-') ? trimmedLine.slice(1).trim() : trimmedLine;
@@ -807,7 +816,7 @@ ${slideText}`;
             value={essay}
             onChange={e => setEssay(e.target.value)}
             className="w-full h-80 mb-4"
-            placeholder="Paste your essay here. Use /// to separate slides. Use - for bullets. Font formatting: *italic*, **bold**, ~strikethrough~, {s} small, {l} large, {x} extra large. Add ^^^ line for extra spacing."
+            placeholder="Paste your essay here. Use /// to separate slides. Use - for bullets. Use > to indent a line (>> for deeper). Font formatting: *italic*, **bold**, ~strikethrough~, {s} small, {l} large, {x} extra large. Add ^^^ line for extra spacing."
           />
         )}
         <Button onClick={generateSlides}>
@@ -821,6 +830,7 @@ ${slideText}`;
             <div><code className="bg-gray-200 px-1 rounded">**text**</code> — <strong>bold</strong></div>
             <div><code className="bg-gray-200 px-1 rounded">~text~</code> — <span style={{textDecoration: 'line-through'}}>strikethrough</span></div>
             <div><code className="bg-gray-200 px-1 rounded">- text</code> — bullet point</div>
+            <div><code className="bg-gray-200 px-1 rounded">&gt; text</code> — indent (<code className="bg-gray-200 px-1 rounded">&gt;&gt;</code> deeper)</div>
             <div><code className="bg-gray-200 px-1 rounded">^^^</code> — extra vertical spacing</div>
             <div><code className="bg-gray-200 px-1 rounded">{'{s}'}</code> — small text (70%)</div>
             <div><code className="bg-gray-200 px-1 rounded">{'{l}'}</code> — large text (130%)</div>
