@@ -639,7 +639,7 @@ ${slideText}`;
             rel="noopener noreferrer"
             className="underline underline-offset-2 hover:text-[#6b6860] transition-colors"
           >
-            Dave Balter, who writes every Tuesday →
+            Dave Balter, who publishes every Tuesday — regular, like fiber for the soul →
           </a>
         </p>
       </div>
@@ -649,6 +649,17 @@ ${slideText}`;
 
         {/* LEFT PANE — Editor & Controls */}
         <div className="w-1/2 overflow-y-auto p-6 border-r border-gray-200">
+
+      {/* How it works */}
+      <div className="mb-6 p-4 border border-gray-200 rounded-xl bg-gray-50">
+        <p className="text-sm font-semibold mb-2" style={{ color: '#1a1916' }}>How it works</p>
+        <ol className="space-y-1 text-sm" style={{ color: '#6b6860' }}>
+          <li><span className="font-semibold" style={{ color: '#1a1916' }}>1.</span> Write your piece, then paste it into the editor below.</li>
+          <li><span className="font-semibold" style={{ color: '#1a1916' }}>2.</span> Break it into slides with <code className="bg-gray-200 px-1 rounded text-xs">///</code> and style the text using the formatting reference.</li>
+          <li><span className="font-semibold" style={{ color: '#1a1916' }}>3.</span> Pick a font and give the piece a title.</li>
+          <li><span className="font-semibold" style={{ color: '#1a1916' }}>4.</span> Hit <span className="font-semibold" style={{ color: '#1a1916' }}>Generate Slides</span>, then download PNGs for Instagram or a PDF for LinkedIn.</li>
+        </ol>
+      </div>
 
       {/* Style Controls */}
       <div className="mb-6 p-5 border border-gray-200 rounded-xl bg-white shadow-sm">
