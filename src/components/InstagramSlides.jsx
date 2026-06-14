@@ -2,11 +2,27 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Maximize2, Download, Plus, X, FileText, Linkedin, Send, Loader2, Copy, Check } from 'lucide-react';
+import { Maximize2, Download, Plus, X, FileText, Linkedin, Send, Loader2, Copy, Check, ArrowUpRight, PenLine } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { jsPDF } from 'jspdf';
 
 const DEFAULT_ESSAY = '';
+
+const WRITING = {
+  buttondown: 'https://buttondown.com/balter/archive/',
+  medium: 'https://medium.com/@davebalter',
+  instagram: 'https://www.instagram.com/baltererer/',
+};
+
+// Hand-picked "gateway" pieces — the front doors shown to new tool users.
+// The thank-you card rotates through these on each visit.
+// Hooks are starting points — tighten them in your own voice anytime.
+const FEATURED = [
+  { title: 'The Pool Guy', hook: 'He came to clean the pool. He stayed to rearrange my life.', url: 'https://buttondown.com/balter/archive/the-pool-guy/' },
+  { title: 'The Hand', hook: 'The smallest gesture, and everything it was quietly holding.', url: 'https://buttondown.com/balter/archive/the-hand/' },
+  { title: 'Jew to Jew', hook: 'On belonging, discomfort, and the things we only say to our own.', url: 'https://buttondown.com/balter/archive/jew-to-jew/' },
+  { title: 'The Impossible Why', hook: 'my friend blair died at 47...', url: 'https://buttondown.com/balter/archive/the-impossible-why/' },
+];
 
 export default function InstagramSlides() {
   const isWatermarkRoute = window.location.pathname === '/watermark';
@@ -44,6 +60,8 @@ export default function InstagramSlides() {
   const [promptCopied, setPromptCopied] = useState(false);
   const [showPlainText, setShowPlainText] = useState(false);
   const [plainTextCopied, setPlainTextCopied] = useState(false);
+  const [showThanks, setShowThanks] = useState(false);
+  const [featured] = useState(() => FEATURED[Math.floor(Math.random() * FEATURED.length)]);
   const canvasRef = useRef(null);
   const fileInputRefs = useRef({});
 
@@ -548,6 +566,7 @@ ${slideText}`;
     slideImages.forEach((img, i) => {
       setTimeout(() => downloadSlide(img, i), i * 200);
     });
+    setShowThanks(true);
   };
 
   const handleImageInsert = (position, file) => {
@@ -601,6 +620,7 @@ ${slideText}`;
 
     const pdfName = pieceTitle.trim() ? `${slugify(pieceTitle)}.pdf` : 'slides.pdf';
     pdf.save(pdfName);
+    setShowThanks(true);
   };
 
   return (
@@ -611,6 +631,17 @@ ${slideText}`;
       <div className="py-3 px-6 text-center border-b border-gray-200 shrink-0">
         <h1 className="text-2xl font-semibold tracking-tight" style={{color: '#1a1916'}}>StoryShelf Slides</h1>
         <p className="text-xs" style={{color: '#8a8880'}}>Turn your writing into beautiful carousel slides for Instagram and LinkedIn.</p>
+        <p className="text-xs mt-0.5" style={{color: '#a89f8c'}}>
+          a free tool by{' '}
+          <a
+            href={WRITING.buttondown}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline underline-offset-2 hover:text-[#6b6860] transition-colors"
+          >
+            Dave Balter, who writes every Tuesday →
+          </a>
+        </p>
       </div>
 
       {/* Split Pane */}
@@ -856,6 +887,79 @@ ${slideText}`;
             <FileText className="w-5 h-5 mr-2" />
             Create PDF {Object.keys(insertedImages).length > 0 ? '(with photos)' : ''}
           </Button>
+        </div>
+      )}
+
+      {/* Thank-you card — appears the moment slides are exported (peak gratitude) */}
+      {showThanks && slideImages.length > 0 && (
+        <div
+          className="mb-6 relative p-6 border border-[#e7e1d6] rounded-2xl shadow-sm text-left"
+          style={{ background: 'linear-gradient(160deg, #fdfbf7 0%, #f6f1e8 100%)' }}
+        >
+          <button
+            onClick={() => setShowThanks(false)}
+            className="absolute top-3 right-3 text-[#b3b0a8] hover:text-[#6b6860] transition-colors"
+            aria-label="Dismiss"
+          >
+            <X className="w-4 h-4" />
+          </button>
+
+          <div className="flex items-center gap-2 mb-3">
+            <span
+              className="inline-flex items-center justify-center w-7 h-7 rounded-full"
+              style={{ background: '#1a1916', color: '#f6f1e8' }}
+            >
+              <PenLine className="w-3.5 h-3.5" />
+            </span>
+            <span className="text-xs font-medium uppercase tracking-wider" style={{ color: '#a89f8c' }}>
+              Slides ready — thank you
+            </span>
+          </div>
+
+          <p className="text-sm leading-relaxed mb-4" style={{ color: '#5f5c54' }}>
+            Oh hello there. I'm Dave. This tool is free, and it'll stay free — no fee, no catch. In lieu
+            of payment, maybe you'll read one of my pieces (I publish every Tuesday — mini obsessions
+            about life as we know it, or imagine we do).
+          </p>
+
+          {/* Featured gateway story (rotates per visit) */}
+          <a
+            href={featured.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group block p-4 rounded-xl border border-[#ece6da] mb-4 transition-colors hover:border-[#d8cfbd]"
+            style={{ background: 'rgba(255,255,255,0.7)' }}
+          >
+            <span className="block text-[11px] uppercase tracking-wider mb-1" style={{ color: '#a89f8c' }}>
+              Start here
+            </span>
+            <span className="block text-base font-semibold" style={{ color: '#1a1916' }}>
+              {featured.title}
+            </span>
+            <span className="block text-sm mt-0.5 mb-2 leading-snug" style={{ color: '#6b6860' }}>
+              {featured.hook}
+            </span>
+            <span className="inline-flex items-center text-sm font-medium" style={{ color: '#1a1916' }}>
+              Read it
+              <ArrowUpRight className="w-4 h-4 ml-1 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+            </span>
+          </a>
+
+          {/* Subscribe (primary) + quiet secondary links */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <Button asChild>
+              <a href={WRITING.buttondown} target="_blank" rel="noopener noreferrer">
+                Subscribe on Buttondown
+                <ArrowUpRight className="w-4 h-4 ml-2" />
+              </a>
+            </Button>
+            <span className="text-xs" style={{ color: '#a89f8c' }}>
+              or find me on{' '}
+              <a href={WRITING.medium} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-[#6b6860] transition-colors">Medium</a>
+              {' · '}
+              <a href={WRITING.instagram} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-[#6b6860] transition-colors">Instagram</a>
+            </span>
+          </div>
         </div>
       )}
 
@@ -1189,6 +1293,19 @@ ${slideText}`;
         </div>{/* END RIGHT PANE */}
 
       </div>{/* END Split Pane */}
+
+      {/* Minimal footer — ambient links for anyone who leaves without exporting */}
+      <footer className="shrink-0 py-2 px-6 text-center border-t border-gray-100">
+        <p className="text-xs" style={{ color: '#b3b0a8' }}>
+          Dave Balter
+          {' · '}
+          <a href={WRITING.buttondown} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-[#6b6860] transition-colors">Buttondown</a>
+          {' · '}
+          <a href={WRITING.medium} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-[#6b6860] transition-colors">Medium</a>
+          {' · '}
+          <a href={WRITING.instagram} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-[#6b6860] transition-colors">Instagram</a>
+        </p>
+      </footer>
 
       {/* Preview Modal */}
       <Dialog open={preview.show} onOpenChange={show => setPreview({ ...preview, show })}>
