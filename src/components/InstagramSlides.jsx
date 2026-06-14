@@ -8,6 +8,50 @@ import { jsPDF } from 'jspdf';
 
 const DEFAULT_ESSAY = '';
 
+// The example a curious writer sees first — one of Dave's own pieces, so the demo
+// also doubles as a taste of his writing. Exercises ///, {l}/{s}/{x} sizing, and ^^^ spacing.
+const SAMPLE_ESSAY = `{l}I bag groceries with geometric precision, like one might build a Tetris tower.
+I’m not bragging or anything, but you should also know I’m excellent at using the self‑checkout scanner.
+///
+{l}While I recognize you struggle to straighten the crumpled barcode on the rotisserie chicken, I’ve got a secret technique I can’t tell you about.
+By the way, if you search the onion category, choose Vidalia, and override to enter by weight, there’s a Konami code that will spit out skee‑ball tickets and a free banana.
+///
+{l}Do I double‑bag? Of course I double‑bag. In double time. All while you’re still cramming that second bag into the first, tearing holes like a monkey pulling the lid off a tin of nicotine pouches.
+^^^
+^^^
+^^^
+{s}Footnote: why in tarnation would you give monkeys nicotine in the first place?
+///
+{l}Do eggs go in first? Of course not, you assalope. Cans, set up like soldiers readying for battle. Then boxes of Cheez‑It (no, it’s singular—go ahead, look it up in Claude. I’ll wait).
+<waits, checks watch for daily step count, readies to brag>
+///
+{l}What’s that? Yes, of course I put produce in a separate bag. Which I happen to line with frozen burritos, a shortstop’s base check to cool my celery stalks.
+What’s that mean?
+You do like basketball, right?
+///
+While we’re at it, you should know that when I lace my shoes, they always come out perfectly even. I took lessons from the Lace‑King of Winooski, who doesn’t accept just anyone, and who only answers to a special knock at his studio, which happens to be located in a janitor’s closet inside a fro‑yo shop - an excellent choice because it’s low‑key, and you wouldn’t know about it anyway if I didn’t tell you.
+///
+{l}Anyhoo, no flex, but my credit‑card tap‑to‑tip time is at least 0.8 seconds faster than yours.
+That’s because I’m dialed-in and don’t just wave my card around the reader willy‑nilly. <watches as you tap another patron’s leg with your medical marijuana card>
+My technique includes a micro‑flip of my wrist, lower left, soft, like I’m washing the undercarriage of a baby with a bamboo hand cloth.
+///
+{l}Speaking of tips, when I dine out I stare‑tip: straight into the server’s corneas, doing long division, silently sliding decimal points until I land on 20% without so much as blinking. And when I finally do blink, it’s in Morse, alerting them: Dover Sole. From a trawler. North Pacific. If they blink back, I add 5%
+///
+{x}Tipping, by the way, should be a surprise. Keep them guessing: higher, sometimes, because I’m generous and considerate; lower, more often than not, because you have to earn it, you sesquipedalianist.
+///
+I’m no expert, but I am excellent at cardboard box mutilation.
+My X‑Acto blade is from Brazil, sharpened each evening at dusk, the preferred sharpening hour of serious sharpeners. And I’m ambidextrous, so I can open recycling bags with any appendage, arranging statistically sound cardboard trapezoids with surgical precision. Some say it might be ESP or something, but I’m no witch, please.
+///
+{l}I know I come off as humble, but I should let you know I can peel stickers off their backing with one finger. And I can hang pictures on the wall without measuring, just by using my keen sense of eyeballery (yes, even a diptych - which also tells you I'm real good at spelling).
+///
+{l}All of this to say, I’ve got no honorary degree from anywhere, nor an IQ test that says I’m not a Mensa.
+{l}And while some people cure diseases, others build bridges, and a few speak six languages, well - so what?
+///
+Because while you excel at gardening and math and public speaking, I possess elite abilities in everyday fields nobody tracks - and, if we're being honest about the numbers, it's really the sport of everyday life that might be the true measure of a man.
+(or woman, because I'm also trained to understand gender, even if I can admit I'm no psychometrician.)
+^^^
+{s}Dave Balter, June 2026`;
+
 const WRITING = {
   buttondown: 'https://buttondown.com/balter/archive/',
   medium: 'https://medium.com/@davebalter',
@@ -244,6 +288,12 @@ ${slideText}`;
 
   const generateSlides = () => {
     setSlides(essay.split('///').map(slide => slide.trim()).filter(slide => slide.length > 0));
+  };
+
+  const loadExample = () => {
+    setEssay(SAMPLE_ESSAY);
+    setPieceTitle('The Sport of Everyday Life');
+    setSlides(SAMPLE_ESSAY.split('///').map(slide => slide.trim()).filter(slide => slide.length > 0));
   };
 
   const parseTextSegments = (text) => {
@@ -644,6 +694,11 @@ ${slideText}`;
         </p>
       </div>
 
+      {/* Desktop nudge — only shown on small screens, where the split layout is cramped */}
+      <div className="sm:hidden shrink-0 px-4 py-2 text-center text-xs border-b" style={{ background: '#fbf6ea', color: '#8a7a4f', borderColor: '#f0e7d0' }}>
+        Best on a desktop — the editor and live preview sit side by side.
+      </div>
+
       {/* Split Pane */}
       <div className="flex flex-1 min-h-0">
 
@@ -861,9 +916,18 @@ ${slideText}`;
             placeholder="Paste your essay here. Use /// to separate slides. Use - for bullets. Use > to indent a line (>> for deeper). Font formatting: *italic*, **bold**, ~strikethrough~, {s} small, {l} large, {x} extra large. Add ^^^ line for extra spacing."
           />
         )}
-        <Button onClick={generateSlides}>
-          Generate Slides
-        </Button>
+        <div className="flex items-center gap-4">
+          <Button onClick={generateSlides}>
+            Generate Slides
+          </Button>
+          <button
+            onClick={loadExample}
+            className="text-sm underline underline-offset-2 transition-colors"
+            style={{ color: '#8a8880' }}
+          >
+            or try an example →
+          </button>
+        </div>
         <div className="mt-4 p-4 border rounded-lg bg-gray-50 text-sm text-gray-600">
           <p className="font-semibold text-gray-700 mb-2">Formatting Reference</p>
           <div className="grid grid-cols-2 gap-x-8 gap-y-1">
