@@ -1453,8 +1453,8 @@ ${slideText}`;
         </div>
       )}
 
-      {/* Publish to davebalter.com (gated — only the owner has the passphrase) */}
-      {slideImages.length > 0 && (
+      {/* Publish to davebalter.com — hidden from the public (needs ?publish in the URL, or a prior unlock) */}
+      {slideImages.length > 0 && (new URLSearchParams(window.location.search).has('publish') || publishUnlocked) && (
         <div className="mt-4 p-5 border border-gray-200 rounded-xl bg-white shadow-sm">
           <h3 className="text-lg font-semibold mb-2" style={{ color: '#1a1916' }}>Publish to davebalter.com</h3>
           {!publishUnlocked ? (
