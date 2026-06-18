@@ -106,6 +106,12 @@ export default function InstagramSlides() {
   const [plainTextCopied, setPlainTextCopied] = useState(false);
   const [showThanks, setShowThanks] = useState(false);
   const [featured] = useState(() => FEATURED[Math.floor(Math.random() * FEATURED.length)]);
+  const [publishPass, setPublishPass] = useState(() => (typeof localStorage !== 'undefined' && localStorage.getItem('davebalter_pass')) || '');
+  const [publishUnlocked, setPublishUnlocked] = useState(() => typeof localStorage !== 'undefined' && !!localStorage.getItem('davebalter_pass'));
+  const [publishDate, setPublishDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [publishEngagement, setPublishEngagement] = useState('');
+  const [publishStatus, setPublishStatus] = useState(''); // '', 'publishing', 'success', or 'error: ...'
+  const [publishUrl, setPublishUrl] = useState('');
   const canvasRef = useRef(null);
   const fileInputRefs = useRef({});
 
@@ -671,6 +677,88 @@ ${slideText}`;
     const pdfName = pieceTitle.trim() ? `${slugify(pieceTitle)}.pdf` : 'slides.pdf';
     pdf.save(pdfName);
     setShowThanks(true);
+  };
+
+  // --- Publish to davebalter.com -------------------------------------------
+  const hexTriple = (hex) => `${parseInt(hex.slice(1, 3), 16)},${parseInt(hex.slice(3, 5), 16)},${parseInt(hex.slice(5, 7), 16)}`;
+
+  // Resize an inserted photo (data URL) to web size and return base64 (no prefix).
+  const resizeForWeb = (dataUrl, maxDim = 1280, quality = 0.86) => new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      resolve(c.toDataURL('image/jpeg', quality).split(',')[1]);
+    };
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+
+  const buildEssayMarkdown = (photoAfterStr) => {
+    const c = styles.colors;
+    const fm = [
+      '---',
+      `title: ${pieceTitle.trim()}`,
+      `date: ${publishDate}`,
+      `font: ${styles.fontFamily}`,
+      `top: ${hexTriple(c.gradientStart)}`,
+      `mid: ${hexTriple(c.gradientMiddle)}`,
+      `bot: ${hexTriple(c.gradientEnd)}`,
+      `text: ${hexTriple(c.text)}`,
+      `engagement: ${parseInt(publishEngagement, 10) || 0}`,
+      `photoAfter: ${photoAfterStr}`,
+      '---',
+    ].join('\n');
+    return `${fm}\n${essay.trim()}\n`;
+  };
+
+  const unlockPublish = () => {
+    if (!publishPass.trim()) return;
+    localStorage.setItem('davebalter_pass', publishPass.trim());
+    setPublishUnlocked(true);
+  };
+
+  const publishToDavebalter = async () => {
+    if (!pieceTitle.trim()) { setPublishStatus('error: add a Piece Title first (used for the title and URL)'); return; }
+    setPublishStatus('publishing');
+    setPublishUrl('');
+    try {
+      // Map inserted photos -> files + photoAfter (position key = "after slide N"; 0 = cover)
+      const photos = [];
+      const parts = [];
+      const positions = Object.keys(insertedImages).map(Number).sort((a, b) => a - b);
+      for (const pos of positions) {
+        const imgs = insertedImages[pos] || [];
+        const names = [];
+        for (let idx = 0; idx < imgs.length; idx++) {
+          const name = `photo-${pos}-${idx}.jpg`;
+          names.push(name);
+          photos.push({ name, dataBase64: await resizeForWeb(imgs[idx]) });
+        }
+        if (names.length) parts.push(`${pos}=${names.join(',')}`);
+      }
+      const essayMarkdown = buildEssayMarkdown(parts.join(';'));
+
+      const res = await fetch('/api/publish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ passphrase: publishPass, essayMarkdown, slug: slugify(pieceTitle), title: pieceTitle.trim(), photos }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPublishStatus('success');
+        setPublishUrl(data.url);
+      } else {
+        if (res.status === 401) { setPublishUnlocked(false); localStorage.removeItem('davebalter_pass'); }
+        setPublishStatus('error: ' + (data.error || 'publish failed'));
+      }
+    } catch (err) {
+      setPublishStatus('error: ' + err.message);
+    }
   };
 
   return (
@@ -1362,6 +1450,76 @@ ${slideText}`;
               Open Instagram
             </Button>
           </div>
+        </div>
+      )}
+
+      {/* Publish to davebalter.com (gated — only the owner has the passphrase) */}
+      {slideImages.length > 0 && (
+        <div className="mt-4 p-5 border border-gray-200 rounded-xl bg-white shadow-sm">
+          <h3 className="text-lg font-semibold mb-2" style={{ color: '#1a1916' }}>Publish to davebalter.com</h3>
+          {!publishUnlocked ? (
+            <div>
+              <p className="text-sm mb-3" style={{ color: '#8a8880' }}>Private — for the site owner. Enter the passphrase to enable publishing.</p>
+              <div className="flex gap-2 max-w-sm">
+                <Input
+                  type="password"
+                  value={publishPass}
+                  onChange={e => setPublishPass(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') unlockPublish(); }}
+                  placeholder="Passphrase"
+                />
+                <Button variant="outline" onClick={unlockPublish}>Unlock</Button>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <p className="text-sm mb-4" style={{ color: '#8a8880' }}>
+                Publishes this piece (text, colors, font, and inserted photos) as a new essay on davebalter.com.
+                Uses the <span className="font-medium">Piece Title</span> above for the title and URL.
+              </p>
+              <div className="flex flex-wrap items-end gap-4 mb-4">
+                <div>
+                  <label className="block text-xs mb-1" style={{ color: '#8a8880' }}>Publish date</label>
+                  <Input type="date" value={publishDate} onChange={e => setPublishDate(e.target.value)} className="w-44" />
+                </div>
+                <div>
+                  <label className="block text-xs mb-1" style={{ color: '#8a8880' }}>Likes (optional, for “Most loved”)</label>
+                  <Input type="number" value={publishEngagement} onChange={e => setPublishEngagement(e.target.value)} placeholder="0" className="w-32" />
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <Button
+                  onClick={publishToDavebalter}
+                  disabled={publishStatus === 'publishing' || !pieceTitle.trim()}
+                  style={{ background: '#1a1916', color: 'white' }}
+                  className="hover:opacity-90"
+                >
+                  {publishStatus === 'publishing'
+                    ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Publishing…</>)
+                    : (<><Send className="w-4 h-4 mr-2" />Publish to davebalter.com</>)}
+                </Button>
+                <button
+                  onClick={() => { localStorage.removeItem('davebalter_pass'); setPublishUnlocked(false); setPublishPass(''); }}
+                  className="text-xs underline"
+                  style={{ color: '#b3b0a8' }}
+                >
+                  lock
+                </button>
+              </div>
+              {!pieceTitle.trim() && (
+                <p className="mt-2 text-xs text-amber-600">Add a Piece Title above first — it becomes the essay title and URL.</p>
+              )}
+              {publishStatus === 'success' && (
+                <p className="mt-3 text-sm text-green-600">
+                  Published! It’ll be live in a minute.{' '}
+                  {publishUrl && <a href={publishUrl} target="_blank" rel="noopener noreferrer" className="underline">View it</a>}
+                </p>
+              )}
+              {publishStatus.startsWith('error') && (
+                <p className="mt-3 text-sm text-red-600">{publishStatus.replace(/^error:\s*/, '')}</p>
+              )}
+            </div>
+          )}
         </div>
       )}
 
