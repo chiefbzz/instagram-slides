@@ -768,16 +768,16 @@ ${slideText}`;
       {/* Header */}
       <div className="py-3 px-6 text-center border-b border-gray-200 shrink-0">
         <h1 className="text-2xl font-semibold tracking-tight" style={{color: '#1a1916'}}>StoryShelf Slides</h1>
-        <p className="text-xs" style={{color: '#8a8880'}}>Turn your writing into beautiful carousel slides for Instagram and LinkedIn.</p>
+        <p className="text-xs" style={{color: '#8a8880'}}>Turn your writing into beautiful carousel slides.</p>
         <p className="text-xs mt-0.5" style={{color: '#a89f8c'}}>
           a free tool by{' '}
           <a
-            href={WRITING.buttondown}
+            href="https://davebalter.com"
             target="_blank"
             rel="noopener noreferrer"
             className="underline underline-offset-2 hover:text-[#6b6860] transition-colors"
           >
-            Dave Balter, who publishes every Tuesday — regular, like fiber for the soul →
+            Dave Balter — read the stories at davebalter.com →
           </a>
         </p>
       </div>
@@ -1364,94 +1364,6 @@ ${slideText}`;
         )}
       </div>
 
-      {/* LinkedIn Section */}
-      {slides.length > 0 && (
-        <div className="mt-8 p-5 border border-gray-200 rounded-xl bg-white shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold flex items-center gap-2">
-              <Linkedin className="w-5 h-5 text-blue-600" />
-              LinkedIn Draft
-            </h3>
-            {!linkedin.token ? (
-              <Button onClick={connectLinkedin} className="bg-blue-600 hover:bg-blue-700">
-                <Linkedin className="w-4 h-4 mr-2" />
-                Connect LinkedIn
-              </Button>
-            ) : (
-              <span className="text-sm text-green-600">Connected as {linkedin.name}</span>
-            )}
-          </div>
-          <p className="text-sm mb-4" style={{color: '#8a8880'}}>Write your post copy, then save as a draft to LinkedIn with your PDF attached. You'll review and publish from LinkedIn.</p>
-
-          <Textarea
-            value={linkedinPost}
-            onChange={e => setLinkedinPost(e.target.value)}
-            className="w-full h-32 mb-4"
-            placeholder="Write or paste your LinkedIn post copy here..."
-          />
-          <div className="flex gap-3">
-            {linkedin.token ? (
-              <Button
-                onClick={postToLinkedin}
-                disabled={!linkedinPost.trim() || linkedinStatus === 'posting'}
-                className="bg-blue-600 hover:bg-blue-700"
-              >
-                {linkedinStatus === 'posting' ? (
-                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving...</>
-                ) : (
-                  <><Send className="w-4 h-4 mr-2" />Save draft to LinkedIn</>
-                )}
-              </Button>
-            ) : (
-              <Button
-                onClick={() => {
-                  navigator.clipboard.writeText(linkedinPost);
-                  setLinkedinStatus('copied');
-                  setTimeout(() => setLinkedinStatus(''), 2000);
-                }}
-                disabled={!linkedinPost.trim()}
-                variant="outline"
-              >
-                {linkedinStatus === 'copied' ? (
-                  <><Check className="w-4 h-4 mr-2" />Copied!</>
-                ) : (
-                  <><Copy className="w-4 h-4 mr-2" />Copy text</>
-                )}
-              </Button>
-            )}
-          </div>
-          {linkedinStatus === 'success' && (
-            <p className="mt-3 text-sm text-green-600">Draft saved! Open LinkedIn to review and publish.</p>
-          )}
-          {linkedinStatus === 'error' && (
-            <p className="mt-3 text-sm text-red-600">Failed to save draft. Try reconnecting LinkedIn.</p>
-          )}
-        </div>
-      )}
-
-      {/* Instagram Section */}
-      {slideImages.length > 0 && (
-        <div className="mt-4 p-5 border border-gray-200 rounded-xl bg-white shadow-sm">
-          <h3 className="text-lg font-semibold flex items-center gap-2 mb-2">
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="#E1306C" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="5"/><circle cx="17.5" cy="6.5" r="1.5" fill="#E1306C" stroke="none"/></svg>
-            Post to Instagram
-          </h3>
-          <p className="text-sm mb-4" style={{color: '#8a8880'}}>Download your slides, then open Instagram to create a carousel post.</p>
-          <div className="flex gap-3">
-            <Button onClick={downloadAll} variant="outline">
-              <Download className="w-4 h-4 mr-2" />
-              Download all slides
-            </Button>
-            <Button
-              onClick={() => window.open('https://www.instagram.com', '_blank')}
-              style={{background: '#E1306C', color: 'white'}}
-              className="hover:opacity-90"
-            >
-              Open Instagram
-            </Button>
-          </div>
-        </div>
-      )}
 
       {/* Publish to davebalter.com — hidden from the public (needs ?publish in the URL, or a prior unlock) */}
       {slideImages.length > 0 && (new URLSearchParams(window.location.search).has('publish') || publishUnlocked) && (
