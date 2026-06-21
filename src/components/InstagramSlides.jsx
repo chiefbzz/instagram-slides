@@ -112,6 +112,9 @@ export default function InstagramSlides() {
   const [publishEngagement, setPublishEngagement] = useState('');
   const [publishStatus, setPublishStatus] = useState(''); // '', 'publishing', 'success', or 'error: ...'
   const [publishUrl, setPublishUrl] = useState('');
+  const [publishSlug, setPublishSlug] = useState(''); // set when editing an imported story, so re-publish overwrites it
+  const [importSlug, setImportSlug] = useState('');
+  const [importStatus, setImportStatus] = useState(''); // '', 'loading', 'loaded', or 'error: ...'
   const canvasRef = useRef(null);
   const fileInputRefs = useRef({});
 
@@ -722,6 +725,84 @@ ${slideText}`;
     setPublishUnlocked(true);
   };
 
+  // "r,g,b" -> "#rrggbb"
+  const tripleToHex = (t) => '#' + (t || '').split(',').map(n => (parseInt(n, 10) || 0).toString(16).padStart(2, '0')).join('');
+
+  // Pull a published story back into the editor so it can be edited and re-published.
+  const importFromDavebalter = async () => {
+    if (!importSlug.trim()) { setImportStatus('error: enter a story slug or davebalter.com link'); return; }
+    setImportStatus('loading');
+    try {
+      const res = await fetch('/api/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ passphrase: publishPass, slug: importSlug.trim() }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        if (res.status === 401) { setPublishUnlocked(false); localStorage.removeItem('davebalter_pass'); }
+        setImportStatus('error: ' + (data.error || 'could not load story'));
+        return;
+      }
+
+      // Split frontmatter / body.
+      const m = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(data.markdown);
+      if (!m) { setImportStatus('error: could not parse that story file'); return; }
+      const fm = {};
+      m[1].split('\n').forEach(line => {
+        const i = line.indexOf(':');
+        if (i > -1) fm[line.slice(0, i).trim()] = line.slice(i + 1).trim();
+      });
+      const body = m[2].trim();
+
+      if (fm.images && !body) {
+        setImportStatus('error: this is an image-only (art-baked) carousel — it can\'t be edited here');
+        return;
+      }
+
+      // Restore text, title, date, engagement.
+      setPieceTitle(fm.title || '');
+      setEssay(body);
+      setSlides(body.split('///').map(s => s.trim()).filter(Boolean));
+      if (fm.date) setPublishDate(fm.date);
+      setPublishEngagement(fm.engagement ? String(parseInt(fm.engagement, 10) || 0) : '');
+
+      // Restore font + colors.
+      setStyles(prev => ({
+        ...prev,
+        fontFamily: fm.font || prev.fontFamily,
+        colors: {
+          gradientStart: fm.top ? tripleToHex(fm.top) : prev.colors.gradientStart,
+          gradientMiddle: fm.mid ? tripleToHex(fm.mid) : prev.colors.gradientMiddle,
+          gradientEnd: fm.bot ? tripleToHex(fm.bot) : prev.colors.gradientEnd,
+          text: fm.text ? tripleToHex(fm.text) : prev.colors.text,
+        },
+        slideSpecific: {},
+      }));
+
+      // Restore photos at their positions. photoAfter: "0=cover.jpg;4=a.jpg,b.jpg" (0 = cover).
+      const byName = {};
+      (data.photos || []).forEach(p => { byName[p.name] = p.dataUrl; });
+      const placed = {};
+      (fm.photoAfter || '').split(';').map(s => s.trim()).filter(Boolean).forEach(part => {
+        const eq = part.indexOf('=');
+        if (eq < 0) return;
+        const pos = parseInt(part.slice(0, eq), 10);
+        if (Number.isNaN(pos)) return;
+        const urls = part.slice(eq + 1).split(',').map(n => byName[n.trim()]).filter(Boolean);
+        if (urls.length) placed[pos] = urls;
+      });
+      setInsertedImages(placed);
+
+      setPublishSlug(data.slug); // re-publish overwrites this same story
+      setPublishStatus('');
+      setPublishUrl('');
+      setImportStatus(`loaded — editing "${fm.title || data.slug}". Edit, then Publish to update it.`);
+    } catch (err) {
+      setImportStatus('error: ' + err.message);
+    }
+  };
+
   const publishToDavebalter = async () => {
     if (!pieceTitle.trim()) { setPublishStatus('error: add a Piece Title first (used for the title and URL)'); return; }
     setPublishStatus('publishing');
@@ -746,7 +827,7 @@ ${slideText}`;
       const res = await fetch('/api/publish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ passphrase: publishPass, essayMarkdown, slug: slugify(pieceTitle), title: pieceTitle.trim(), photos }),
+        body: JSON.stringify({ passphrase: publishPass, essayMarkdown, slug: publishSlug || slugify(pieceTitle), title: pieceTitle.trim(), photos }),
       });
       const data = await res.json();
       if (data.success) {
@@ -1366,7 +1447,7 @@ ${slideText}`;
 
 
       {/* Publish to davebalter.com — hidden from the public (needs ?publish in the URL, or a prior unlock) */}
-      {slideImages.length > 0 && (new URLSearchParams(window.location.search).has('publish') || publishUnlocked) && (
+      {(new URLSearchParams(window.location.search).has('publish') || publishUnlocked) && (
         <div className="mt-4 p-5 border border-gray-200 rounded-xl bg-white shadow-sm">
           <h3 className="text-lg font-semibold mb-2" style={{ color: '#1a1916' }}>Publish to davebalter.com</h3>
           {!publishUnlocked ? (
@@ -1385,9 +1466,29 @@ ${slideText}`;
             </div>
           ) : (
             <div>
+              {/* Edit an existing story: pull it back into the editor */}
+              <div className="mb-4 pb-4 border-b border-gray-100">
+                <label className="block text-xs mb-1" style={{ color: '#8a8880' }}>Edit an existing story — paste its slug or davebalter.com link</label>
+                <div className="flex gap-2 max-w-lg">
+                  <Input
+                    value={importSlug}
+                    onChange={e => setImportSlug(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') importFromDavebalter(); }}
+                    placeholder="the-hand   (or  https://davebalter.com/?essay=the-hand)"
+                  />
+                  <Button variant="outline" onClick={importFromDavebalter} disabled={importStatus === 'loading'}>
+                    {importStatus === 'loading' ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Loading…</>) : 'Load'}
+                  </Button>
+                </div>
+                {importStatus === 'loading' && <p className="mt-2 text-xs" style={{ color: '#8a8880' }}>Pulling text, colors, font and photos…</p>}
+                {importStatus.startsWith('loaded') && <p className="mt-2 text-xs text-green-600">{importStatus}</p>}
+                {importStatus.startsWith('error') && <p className="mt-2 text-xs text-red-600">{importStatus.replace(/^error:\s*/, '')}</p>}
+              </div>
+
               <p className="text-sm mb-4" style={{ color: '#8a8880' }}>
-                Publishes this piece (text, colors, font, and inserted photos) as a new essay on davebalter.com.
+                Publishes this piece (text, colors, font, and inserted photos) to davebalter.com.
                 Uses the <span className="font-medium">Piece Title</span> above for the title and URL.
+                {publishSlug && <span className="block mt-1 text-amber-600">Editing <span className="font-medium">{publishSlug}</span> — publishing will update that story (same URL).{' '}<button onClick={() => setPublishSlug('')} className="underline">publish as a new story instead</button></span>}
               </p>
               <div className="flex flex-wrap items-end gap-4 mb-4">
                 <div>
