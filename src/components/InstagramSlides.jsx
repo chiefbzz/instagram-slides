@@ -58,6 +58,9 @@ const WRITING = {
   instagram: 'https://www.instagram.com/baltererer/',
 };
 
+// davebalter.com browse categories (suggestions; free text is allowed for new ones).
+const CATEGORIES = ['Work & Money', 'Vices', 'Music', 'Love & Family', 'Everyday Life', 'Grief & Loss', 'Writing & AI', 'Identity & Belonging'];
+
 // Hand-picked "gateway" pieces — the front doors shown to new tool users.
 // The thank-you card rotates through these on each visit.
 // Hooks are starting points — tighten them in your own voice anytime.
@@ -110,6 +113,7 @@ export default function InstagramSlides() {
   const [publishUnlocked, setPublishUnlocked] = useState(() => typeof localStorage !== 'undefined' && !!localStorage.getItem('davebalter_pass'));
   const [publishDate, setPublishDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [publishEngagement, setPublishEngagement] = useState('');
+  const [publishCategory, setPublishCategory] = useState('');
   const [publishStatus, setPublishStatus] = useState(''); // '', 'publishing', 'success', or 'error: ...'
   const [publishUrl, setPublishUrl] = useState('');
   const [publishSlug, setPublishSlug] = useState(''); // set when editing an imported story, so re-publish overwrites it
@@ -706,6 +710,7 @@ ${slideText}`;
     const fm = [
       '---',
       `title: ${pieceTitle.trim()}`,
+      `category: ${publishCategory.trim()}`,
       `date: ${publishDate}`,
       `font: ${styles.fontFamily}`,
       `top: ${hexTriple(c.gradientStart)}`,
@@ -766,6 +771,7 @@ ${slideText}`;
       setSlides(body.split('///').map(s => s.trim()).filter(Boolean));
       if (fm.date) setPublishDate(fm.date);
       setPublishEngagement(fm.engagement ? String(parseInt(fm.engagement, 10) || 0) : '');
+      setPublishCategory(fm.category || '');
 
       // Restore font + colors.
       setStyles(prev => ({
@@ -1498,6 +1504,13 @@ ${slideText}`;
                 <div>
                   <label className="block text-xs mb-1" style={{ color: '#8a8880' }}>Likes (optional, for “Most loved”)</label>
                   <Input type="number" value={publishEngagement} onChange={e => setPublishEngagement(e.target.value)} placeholder="0" className="w-32" />
+                </div>
+                <div>
+                  <label className="block text-xs mb-1" style={{ color: '#8a8880' }}>Category (pick or type a new one)</label>
+                  <Input list="davebalter-categories" value={publishCategory} onChange={e => setPublishCategory(e.target.value)} placeholder="e.g. Work & Money" className="w-52" />
+                  <datalist id="davebalter-categories">
+                    {CATEGORIES.map(c => <option key={c} value={c} />)}
+                  </datalist>
                 </div>
               </div>
               <div className="flex items-center gap-3">
