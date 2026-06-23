@@ -812,6 +812,7 @@ ${slideText}`;
 
   const publishToDavebalter = async () => {
     if (!pieceTitle.trim()) { setPublishStatus('error: add a Piece Title first (used for the title and URL)'); return; }
+    if (!publishCategory.trim()) { setPublishStatus('error: pick a Category first (so it lands in the right filter on the site)'); return; }
     setPublishStatus('publishing');
     setPublishUrl('');
     try {
@@ -1517,7 +1518,7 @@ ${slideText}`;
               <div className="flex items-center gap-3">
                 <Button
                   onClick={publishToDavebalter}
-                  disabled={publishStatus === 'publishing' || !pieceTitle.trim()}
+                  disabled={publishStatus === 'publishing' || !pieceTitle.trim() || !publishCategory.trim()}
                   style={{ background: '#1a1916', color: 'white' }}
                   className="hover:opacity-90"
                 >
@@ -1535,6 +1536,9 @@ ${slideText}`;
               </div>
               {!pieceTitle.trim() && (
                 <p className="mt-2 text-xs text-amber-600">Add a Piece Title above first — it becomes the essay title and URL.</p>
+              )}
+              {pieceTitle.trim() && !publishCategory.trim() && (
+                <p className="mt-2 text-xs text-amber-600">Pick a Category above — every story needs one so it shows in the right filter.</p>
               )}
               {publishStatus === 'success' && (
                 <p className="mt-3 text-sm text-green-600">
