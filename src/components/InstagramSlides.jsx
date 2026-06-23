@@ -59,7 +59,8 @@ const WRITING = {
 };
 
 // davebalter.com browse categories (suggestions; free text is allowed for new ones).
-const CATEGORIES = ['Work & Money', 'Vices', 'Music', 'Love & Family', 'Everyday Life', 'Grief & Loss', 'Writing', 'Reading', 'Identity & Belonging'];
+// Keep to 8 max — the homepage shows at most 8 category chips.
+const CATEGORIES = ['Work & Money', 'Vices', 'Music', 'Love & Family', 'Everyday Life', 'Grief & Loss', 'Writing', 'Identity & Belonging'];
 
 // Hand-picked "gateway" pieces — the front doors shown to new tool users.
 // The thank-you card rotates through these on each visit.
