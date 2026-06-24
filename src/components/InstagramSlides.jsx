@@ -822,9 +822,13 @@ ${slideText}`;
         const imgs = insertedImages[pos] || [];
         const names = [];
         for (let idx = 0; idx < imgs.length; idx++) {
-          const name = `photo-${pos}-${idx}.jpg`;
+          const src = imgs[idx];
+          // Animated GIFs: upload the original bytes untouched (re-encoding would flatten them to one frame).
+          const isGif = /^data:image\/gif/i.test(src);
+          const name = `photo-${pos}-${idx}.${isGif ? 'gif' : 'jpg'}`;
           names.push(name);
-          photos.push({ name, dataBase64: await resizeForWeb(imgs[idx]) });
+          const dataBase64 = isGif ? src.split(',')[1] : await resizeForWeb(src);
+          photos.push({ name, dataBase64 });
         }
         if (names.length) parts.push(`${pos}=${names.join(',')}`);
       }
