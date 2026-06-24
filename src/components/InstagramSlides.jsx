@@ -834,6 +834,14 @@ ${slideText}`;
       }
       const essayMarkdown = buildEssayMarkdown(parts.join(';'));
 
+      // Vercel rejects request bodies over ~4.5MB, so a big photo/GIF would fail silently.
+      const payloadChars = photos.reduce((n, p) => n + (p.dataBase64 ? p.dataBase64.length : 0), 0);
+      if (payloadChars > 4_200_000) {
+        const mb = (payloadChars / 1.37e6).toFixed(1);
+        setPublishStatus(`error: photos total ~${mb}MB — too large to publish through the tool (limit ~4MB). GIFs are usually the culprit; use a smaller/shorter one, or ask to place it directly.`);
+        return;
+      }
+
       const res = await fetch('/api/publish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
