@@ -313,7 +313,7 @@ ${slideText}`;
   const parseTextSegments = (text) => {
     const segments = [];
     let currentText = '';
-    let currentStyle = 'normal';
+    let bold = false, italic = false, strike = false;
     let currentSize = 'normal';
     let i = 0;
 
@@ -321,7 +321,7 @@ ${slideText}`;
       if (currentText) {
         segments.push({
           text: currentText,
-          style: currentStyle,
+          bold, italic, strike,
           size: currentSize
         });
         currentText = '';
@@ -331,7 +331,7 @@ ${slideText}`;
     while (i < text.length) {
       if (text[i] === '~') {
         addSegment();
-        currentStyle = currentStyle === 'strike' ? 'normal' : 'strike';
+        strike = !strike;
         i += 1;
       }
       else if (i + 2 < text.length && text[i] === '{' &&
@@ -343,14 +343,15 @@ ${slideText}`;
         else currentSize = 'xlarge';
         i += 3;
       }
-      else if (i + 1 < text.length && text[i] === '*' && text[i+1] === '*') {
+      // ** = bold, * = italic, *** = both (handled as ** then *)
+      else if (text[i] === '*' && text[i+1] === '*') {
         addSegment();
-        currentStyle = currentStyle === 'bold' ? 'normal' : 'bold';
+        bold = !bold;
         i += 2;
       }
       else if (text[i] === '*') {
         addSegment();
-        currentStyle = currentStyle === 'italic' ? 'normal' : 'italic';
+        italic = !italic;
         i += 1;
       }
       else {
@@ -377,15 +378,10 @@ ${slideText}`;
         style.fontSize = '1.7em';
       }
 
-      if (segment.style === 'bold') {
-        return <strong key={i} style={style}>{segment.text}</strong>;
-      } else if (segment.style === 'italic') {
-        return <em key={i} style={style}>{segment.text}</em>;
-      } else if (segment.style === 'strike') {
-        return <span key={i} style={{...style, textDecoration: 'line-through'}}>{segment.text}</span>;
-      } else {
-        return <span key={i} style={style}>{segment.text}</span>;
-      }
+      if (segment.bold) style.fontWeight = 'bold';
+      if (segment.italic) style.fontStyle = 'italic';
+      if (segment.strike) style.textDecoration = 'line-through';
+      return <span key={i} style={style}>{segment.text}</span>;
     });
   };
 
@@ -425,7 +421,9 @@ ${slideText}`;
           const wordWithSpace = i < words.length - 1 ? word + ' ' : word;
           lines.push({
             text: wordWithSpace,
-            style: segment.style,
+            bold: segment.bold,
+            italic: segment.italic,
+            strike: segment.strike,
             size: segment.size
           });
         });
@@ -444,12 +442,12 @@ ${slideText}`;
           if (item.size === 'large') adjustedSize = scaledSize * 1.3;
           if (item.size === 'xlarge') adjustedSize = scaledSize * 1.7;
 
-          const fontStyle = item.style === 'normal' || item.style === 'strike' ? '' : item.style;
-          ctx.font = `${fontStyle} ${adjustedSize}px ${styles.fontFamily}`;
+          const fontPrefix = `${item.italic ? 'italic ' : ''}${item.bold ? 'bold ' : ''}`;
+          ctx.font = `${fontPrefix}${adjustedSize}px ${styles.fontFamily}`;
 
           ctx.fillText(item.text, currentX, currentY);
 
-          if (item.style === 'strike') {
+          if (item.strike) {
             const metrics = ctx.measureText(item.text);
             const textWidth = metrics.width;
             const strikeY = currentY - adjustedSize * 0.3;
@@ -485,8 +483,8 @@ ${slideText}`;
         if (item.size === 'large') adjustedSize = scaledSize * 1.3;
         if (item.size === 'xlarge') adjustedSize = scaledSize * 1.7;
 
-        const fontStyle = item.style === 'normal' || item.style === 'strike' ? '' : item.style;
-        ctx.font = `${fontStyle} ${adjustedSize}px ${styles.fontFamily}`;
+        const fontPrefix = `${item.italic ? 'italic ' : ''}${item.bold ? 'bold ' : ''}`;
+        ctx.font = `${fontPrefix}${adjustedSize}px ${styles.fontFamily}`;
         const wordWidth = ctx.measureText(item.text).width;
 
         if (lineWidth + wordWidth > maxWidth) {
@@ -1111,6 +1109,7 @@ ${slideText}`;
             <div><code className="bg-gray-200 px-1 rounded">///</code> — slide break</div>
             <div><code className="bg-gray-200 px-1 rounded">*text*</code> — <em>italic</em></div>
             <div><code className="bg-gray-200 px-1 rounded">**text**</code> — <strong>bold</strong></div>
+            <div><code className="bg-gray-200 px-1 rounded">***text***</code> — <strong><em>bold italic</em></strong></div>
             <div><code className="bg-gray-200 px-1 rounded">~text~</code> — <span style={{textDecoration: 'line-through'}}>strikethrough</span></div>
             <div><code className="bg-gray-200 px-1 rounded">- text</code> — bullet point</div>
             <div><code className="bg-gray-200 px-1 rounded">&gt; text</code> — indent (<code className="bg-gray-200 px-1 rounded">&gt;&gt;</code> deeper)</div>
