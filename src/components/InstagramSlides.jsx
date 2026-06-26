@@ -60,7 +60,7 @@ const WRITING = {
 
 // davebalter.com "Spyglass" collections (suggestions; free text is allowed for new ones).
 // Keep to 8 max — the homepage Spyglass section shows at most 8 collections.
-const CATEGORIES = ['Work & Money', 'Everyday Living', 'I Love Tour', 'Love', 'Death', "Writer's Thoughts", 'Altered States', 'No Hugs'];
+const CATEGORIES = ['Work and $', 'Everyday Living', 'Music', 'Love & People', 'Designs of Death', "Writer's Thoughts", 'Altered States', 'Hugless Identity'];
 
 // Hand-picked "gateway" pieces — the front doors shown to new tool users.
 // The thank-you card rotates through these on each visit.
