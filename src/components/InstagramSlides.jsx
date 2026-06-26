@@ -58,9 +58,9 @@ const WRITING = {
   instagram: 'https://www.instagram.com/baltererer/',
 };
 
-// davebalter.com browse categories (suggestions; free text is allowed for new ones).
-// Keep to 8 max — the homepage shows at most 8 category chips.
-const CATEGORIES = ['Work & Money', 'Vices', 'Music', 'Love & Family', 'Everyday Life', 'Grief & Loss', 'Writing', 'Identity & Belonging'];
+// davebalter.com "Spyglass" collections (suggestions; free text is allowed for new ones).
+// Keep to 8 max — the homepage Spyglass section shows at most 8 collections.
+const CATEGORIES = ['Work & Money', 'Everyday Living', 'I Love Tour', 'Love', 'Death', "Writer's Thoughts", 'Altered States', 'No Hugs'];
 
 // Hand-picked "gateway" pieces — the front doors shown to new tool users.
 // The thank-you card rotates through these on each visit.
