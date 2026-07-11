@@ -229,6 +229,8 @@ export default function InstagramSlides() {
       .replace(/\*([^*]+)\*/g, '$1')       // *italic*
       .replace(/~([^~]+)~/g, '$1')         // ~strike~
       .replace(/\{[slx]\}/g, '')           // {s} {l} {x}
+      .replace(/\{#[0-9a-fA-F]{3,6}\}/g, '') // {#hexcolor}
+      .replace(/\{\/\}/g, '')              // {/} color close
       .replace(/^\s*>+\s?/gm, '')          // leading > indent markers
       .replace(/\^\^\^/g, '')              // ^^^
       .replace(/\/\/\//g, '\n\n')          // /// → paragraph break
@@ -315,6 +317,7 @@ ${slideText}`;
     let currentText = '';
     let bold = false, italic = false, strike = false;
     let currentSize = 'normal';
+    let currentColor = null;
     let i = 0;
 
     const addSegment = () => {
@@ -322,14 +325,32 @@ ${slideText}`;
         segments.push({
           text: currentText,
           bold, italic, strike,
-          size: currentSize
+          size: currentSize,
+          color: currentColor
         });
         currentText = '';
       }
     };
 
+    // {#rrggbb} or {#rgb} opens a color; {/} closes it back to the slide default.
+    const colorOpenMatch = () => {
+      const m = text.slice(i).match(/^\{#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})\}/);
+      return m ? m[0] : null;
+    };
+
     while (i < text.length) {
-      if (text[i] === '~') {
+      const colorTag = colorOpenMatch();
+      if (colorTag) {
+        addSegment();
+        currentColor = '#' + colorTag.slice(2, -1);
+        i += colorTag.length;
+      }
+      else if (text[i] === '{' && text[i+1] === '/' && text[i+2] === '}') {
+        addSegment();
+        currentColor = null;
+        i += 3;
+      }
+      else if (text[i] === '~') {
         addSegment();
         strike = !strike;
         i += 1;
@@ -381,6 +402,7 @@ ${slideText}`;
       if (segment.bold) style.fontWeight = 'bold';
       if (segment.italic) style.fontStyle = 'italic';
       if (segment.strike) style.textDecoration = 'line-through';
+      if (segment.color) style.color = segment.color;
       return <span key={i} style={style}>{segment.text}</span>;
     });
   };
@@ -424,7 +446,8 @@ ${slideText}`;
             bold: segment.bold,
             italic: segment.italic,
             strike: segment.strike,
-            size: segment.size
+            size: segment.size,
+            color: segment.color
           });
         });
       });
@@ -444,6 +467,7 @@ ${slideText}`;
 
           const fontPrefix = `${item.italic ? 'italic ' : ''}${item.bold ? 'bold ' : ''}`;
           ctx.font = `${fontPrefix}${adjustedSize}px ${styles.fontFamily}`;
+          ctx.fillStyle = item.color || slideColors.text;
 
           ctx.fillText(item.text, currentX, currentY);
 
@@ -452,6 +476,7 @@ ${slideText}`;
             const textWidth = metrics.width;
             const strikeY = currentY - adjustedSize * 0.3;
             ctx.lineWidth = Math.max(1, adjustedSize * 0.05);
+            ctx.strokeStyle = item.color || slideColors.text;
             ctx.beginPath();
             ctx.moveTo(currentX, strikeY);
             ctx.lineTo(currentX + textWidth, strikeY);
@@ -1100,7 +1125,7 @@ ${slideText}`;
             value={essay}
             onChange={e => setEssay(e.target.value)}
             className="w-full h-80 mb-4"
-            placeholder="Paste your essay here. Use /// to separate slides. Use - for bullets. Use > to indent a line (>> for deeper). Font formatting: *italic*, **bold**, ~strikethrough~, {s} small, {l} large, {x} extra large. Add ^^^ line for extra spacing."
+            placeholder="Paste your essay here. Use /// to separate slides. Use - for bullets. Use > to indent a line (>> for deeper). Font formatting: *italic*, **bold**, ~strikethrough~, {s} small, {l} large, {x} extra large, {#hexcolor}text{/} for color. Add ^^^ line for extra spacing."
           />
         )}
         <div className="flex items-center gap-4">
@@ -1129,6 +1154,7 @@ ${slideText}`;
             <div><code className="bg-gray-200 px-1 rounded">{'{s}'}</code> — small text (70%)</div>
             <div><code className="bg-gray-200 px-1 rounded">{'{l}'}</code> — large text (130%)</div>
             <div><code className="bg-gray-200 px-1 rounded">{'{x}'}</code> — extra large text (170%)</div>
+            <div><code className="bg-gray-200 px-1 rounded">{'{#e07a5f}text{/}'}</code> — colored text</div>
             <div>blank line — paragraph break</div>
           </div>
         </div>
