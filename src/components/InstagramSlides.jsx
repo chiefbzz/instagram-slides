@@ -108,6 +108,7 @@ export default function InstagramSlides() {
   const [promptCopied, setPromptCopied] = useState(false);
   const [showPlainText, setShowPlainText] = useState(false);
   const [plainTextCopied, setPlainTextCopied] = useState(false);
+  const [substackCopied, setSubstackCopied] = useState(''); // '', a success/warning note, or 'error: ...'
   const [showThanks, setShowThanks] = useState(false);
   const [featured] = useState(() => FEATURED[Math.floor(Math.random() * FEATURED.length)]);
   const [publishPass, setPublishPass] = useState(() => (typeof localStorage !== 'undefined' && localStorage.getItem('davebalter_pass')) || '');
@@ -120,6 +121,8 @@ export default function InstagramSlides() {
   const [publishSlug, setPublishSlug] = useState(''); // set when editing an imported story, so re-publish overwrites it
   const [importSlug, setImportSlug] = useState('');
   const [importStatus, setImportStatus] = useState(''); // '', 'loading', 'loaded', or 'error: ...'
+  const [suggestedPalettes, setSuggestedPalettes] = useState([]);
+  const [paletteStatus, setPaletteStatus] = useState(''); // '', 'loading', or 'error: ...'
   const canvasRef = useRef(null);
   const fileInputRefs = useRef({});
 
@@ -137,6 +140,64 @@ export default function InstagramSlides() {
     const g = parseInt(match[2]).toString(16).padStart(2, '0');
     const b = parseInt(match[3]).toString(16).padStart(2, '0');
     return `#${r}${g}${b}`;
+  };
+
+  const hexToHsl = (hex) => {
+    const r = parseInt(hex.slice(1, 3), 16) / 255;
+    const g = parseInt(hex.slice(3, 5), 16) / 255;
+    const b = parseInt(hex.slice(5, 7), 16) / 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h = 0, s = 0;
+    const l = (max + min) / 2;
+    const d = max - min;
+    if (d !== 0) {
+      s = d / (1 - Math.abs(2 * l - 1));
+      switch (max) {
+        case r: h = ((g - b) / d) % 6; break;
+        case g: h = (b - r) / d + 2; break;
+        default: h = (r - g) / d + 4;
+      }
+      h *= 60;
+      if (h < 0) h += 360;
+    }
+    return [h, s, l];
+  };
+
+  const hslToHex = (h, s, l) => {
+    const c = (1 - Math.abs(2 * l - 1)) * s;
+    const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+    const m = l - c / 2;
+    let [r, g, b] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+    const clamp255 = (v) => Math.min(255, Math.max(0, Math.round((v + m) * 255)));
+    return '#' + [r, g, b].map(v => clamp255(v).toString(16).padStart(2, '0')).join('');
+  };
+
+  // Text is light or dark decides whether the background gets brighter or darker
+  // toward the middle/bottom — keeps the gradient reading as intentional, not random.
+  const isLightColor = (hex) => {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    // Perceived luminance (ITU-R BT.601)
+    return (r * 299 + g * 587 + b * 114) / 1000 > 150;
+  };
+
+  // baseColor = top of the gradient; middle/bottom shift lighter (dark text) or
+  // darker (light text) so the background keeps working with the chosen text color.
+  // Steps are a fraction of the remaining room toward the target extreme, not a
+  // fixed lightness delta — a fixed delta collapses middle/end to the same value
+  // when the base is already near black or white (nowhere left for +/-8% to go).
+  const derivePalette = (baseColor, textColor) => {
+    const [h, s, l] = hexToHsl(baseColor);
+    const lighten = !isLightColor(textColor); // dark text -> lighten; light text -> darken
+    const target = lighten ? 0.95 : 0.05;
+    const room = target - l;
+    return {
+      gradientStart: baseColor,
+      gradientMiddle: hslToHex(h, s, l + room * 0.45),
+      gradientEnd: hslToHex(h, s, l + room * 0.85),
+      text: textColor,
+    };
   };
 
   const restoreSettings = (input) => {
@@ -244,6 +305,92 @@ export default function InstagramSlides() {
     navigator.clipboard.writeText(getPlainText());
     setPlainTextCopied(true);
     setTimeout(() => setPlainTextCopied(false), 2000);
+  };
+
+  // Build a Substack-ready version of the piece: the prose with *italic*/**bold**/~strike~
+  // turned into real formatting, and the inserted photos placed inline at their spots.
+  // Images use the published davebalter.com URLs when available (they import cleanly on
+  // paste); otherwise they fall back to the in-tool image data (may need re-dropping).
+  const essayToSubstack = () => {
+    const SITE = 'https://davebalter.com';
+    const slug = publishSlug || slugify(pieceTitle);
+    const hosted = (!!publishSlug || publishStatus === 'success') && !!slug;
+    const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    // Escape first (so stage directions like <waits...> survive as text), then apply emphasis.
+    const inline = s => esc(s)
+      .replace(/\{[slx]\}/g, '')                 // slide-only size tokens — drop
+      .replace(/\{#[0-9a-fA-F]{3,6}\}/g, '')      // color open — drop, keep the text
+      .replace(/\{\/\}/g, '')                     // color close — drop
+      .replace(/\*\*([^*]+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*([^*]+?)\*/g, '<em>$1</em>')
+      .replace(/~([^~]+?)~/g, '<s>$1</s>');
+    const lineToP = raw => {
+      let line = raw.trim();
+      if (!line || line === '^^^') return '';     // spacing markers
+      while (line.startsWith('>')) line = line.slice(1).trim(); // indent markers
+      if (line.startsWith('-')) line = line.slice(1).trim();    // bullet marker
+      const html = inline(line).trim();
+      return html ? `<p>${html}</p>` : '';
+    };
+    const imgTag = (dataUrl, pos, idx) => {
+      const ext = /^data:image\/gif/i.test(dataUrl) ? 'gif' : 'jpg';
+      const src = hosted ? `${SITE}/essays/${slug}/photo-${pos}-${idx}.${ext}` : dataUrl;
+      return `<p><img src="${src}" alt="" /></p>`;
+    };
+    const slidesArr = slides.length ? slides : essay.split('///').map(s => s.trim()).filter(Boolean);
+    const out = [];
+    for (let i = 0; i < slidesArr.length; i++) {
+      (insertedImages[i] || []).forEach((img, idx) => out.push(imgTag(img, i, idx))); // photos before slide i
+      slidesArr[i].split('\n').forEach(l => { const p = lineToP(l); if (p) out.push(p); });
+    }
+    (insertedImages[slidesArr.length] || []).forEach((img, idx) => out.push(imgTag(img, slidesArr.length, idx))); // after last
+    return { html: out.join('\n'), plain: getPlainText(), hosted, hasImages: Object.keys(insertedImages).length > 0 };
+  };
+
+  const copyForSubstack = async () => {
+    const { html, plain, hosted, hasImages } = essayToSubstack();
+    if (!plain.trim()) { setSubstackCopied('error: paste your essay first'); setTimeout(() => setSubstackCopied(''), 2500); return; }
+    try {
+      if (navigator.clipboard && window.ClipboardItem) {
+        await navigator.clipboard.write([new ClipboardItem({
+          'text/html': new Blob([html], { type: 'text/html' }),
+          'text/plain': new Blob([plain], { type: 'text/plain' }),
+        })]);
+      } else {
+        await navigator.clipboard.writeText(plain);
+      }
+      setSubstackCopied(hasImages && !hosted
+        ? '✓ copied — but publish to davebalter.com first so the photos come through'
+        : '✓ copied — paste into a new Substack draft');
+      setTimeout(() => setSubstackCopied(''), 4000);
+    } catch (err) {
+      setSubstackCopied('error: ' + err.message);
+      setTimeout(() => setSubstackCopied(''), 4000);
+    }
+  };
+
+  const suggestPalettes = async () => {
+    const text = getPlainText();
+    if (!text.trim()) { setPaletteStatus('error: paste your essay first'); return; }
+    setPaletteStatus('loading');
+    setSuggestedPalettes([]);
+    try {
+      const res = await fetch('/api/palette', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ passphrase: publishPass, text }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        if (res.status === 401) { setPublishUnlocked(false); localStorage.removeItem('davebalter_pass'); }
+        setPaletteStatus('error: ' + (data.error || 'could not generate palettes'));
+        return;
+      }
+      setSuggestedPalettes(data.palettes);
+      setPaletteStatus('');
+    } catch (err) {
+      setPaletteStatus('error: ' + err.message);
+    }
   };
 
   const generateLinkedinPrompt = () => {
@@ -1039,6 +1186,44 @@ ${slideText}`;
                 />
               </div>
             </div>
+
+            {publishUnlocked && (
+              <div className="mt-2">
+                <button
+                  onClick={suggestPalettes}
+                  disabled={paletteStatus === 'loading'}
+                  className="flex items-center gap-1 text-xs text-gray-500 hover:text-blue-500 border border-dashed border-gray-300 hover:border-blue-400 rounded-full px-3 py-1 transition-colors disabled:opacity-50"
+                >
+                  {paletteStatus === 'loading' ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                  Suggest Palettes
+                </button>
+                {paletteStatus.startsWith('error') && (
+                  <p className="text-xs text-red-500 mt-1">{paletteStatus.replace('error: ', '')}</p>
+                )}
+                {suggestedPalettes.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {suggestedPalettes.map((p, i) => {
+                      const derived = derivePalette(p.baseColor, p.textColor);
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => setStyles({ ...styles, colors: derived })}
+                          className="flex flex-col items-center gap-1 p-1.5 rounded-lg border border-gray-200 hover:border-blue-400 transition-colors"
+                          title={p.label}
+                        >
+                          <div
+                            className="w-14 h-14 rounded"
+                            style={{ background: `linear-gradient(to bottom, ${derived.gradientStart}, ${derived.gradientMiddle}, ${derived.gradientEnd})` }}
+                          />
+                          <span className="text-[10px] text-gray-500 max-w-[64px] leading-tight text-center">{p.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="mt-2">
               <div
                 className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded text-xs font-mono cursor-pointer hover:bg-gray-200 transition-colors"
@@ -1116,6 +1301,19 @@ ${slideText}`;
                 <><Copy className="w-3 h-3 mr-1" />Copy Plain Text</>
               )}
             </Button>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={copyForSubstack}
+            title="Copy the piece with italics/bold and inline photos, ready to paste into a new Substack draft"
+          >
+            <Copy className="w-3 h-3 mr-1" />Copy for Substack
+          </Button>
+          {substackCopied && (
+            <span className={`text-xs ${substackCopied.startsWith('error') ? 'text-red-500' : 'text-gray-500'}`}>
+              {substackCopied.replace(/^error: /, '')}
+            </span>
           )}
         </div>
         {showPlainText ? (
