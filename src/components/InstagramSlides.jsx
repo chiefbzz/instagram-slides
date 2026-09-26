@@ -1310,6 +1310,9 @@ ${slideText}`;
           >
             <Copy className="w-3 h-3 mr-1" />Copy for Substack
           </Button>
+          <Button size="sm" onClick={generateSlides}>
+            Generate Slides
+          </Button>
           {substackCopied && (
             <span className={`text-xs ${substackCopied.startsWith('error') ? 'text-red-500' : 'text-gray-500'}`}>
               {substackCopied.replace(/^error: /, '')}
@@ -1327,9 +1330,6 @@ ${slideText}`;
           />
         )}
         <div className="flex items-center gap-4">
-          <Button onClick={generateSlides}>
-            Generate Slides
-          </Button>
           <button
             onClick={loadExample}
             className="text-sm underline underline-offset-2 transition-colors"
