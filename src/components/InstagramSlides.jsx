@@ -100,12 +100,19 @@ function prepublishChecks({ essay, pieceTitle, publishDate, publishCategory }) {
       if (/\b(e\.g|i\.e|a\.m|p\.m|U\.S)\b/i.test(snip)) continue;
       issues.push(`Slide ${i + 1}: no space after punctuation — “…${snip}…”`);
     }
-    const bold = (slide.match(/\*\*/g) || []).length;
-    const ital = (slide.replace(/\*\*/g, '').match(/\*/g) || []).length;
-    if (bold % 2) issues.push(`Slide ${i + 1}: a ** (bold) mark has no partner`);
-    if (ital % 2) issues.push(`Slide ${i + 1}: a * (italic) mark has no partner`);
-    const opens = (slide.match(/\{#[0-9a-fA-F]{3,6}\}/g) || []).length, closes = (slide.match(/\{\/\}/g) || []).length;
-    if (opens !== closes) issues.push(`Slide ${i + 1}: a {#color} has no matching {/}`);
+    // Emphasis is parsed line by line on the site, so pair the marks per line. A * between
+    // two letters ("sh*t") is a censor mark, not italics — but the site will still read it
+    // as italics, so say what to use instead. Colors need no partner: they end with the line.
+    slide.split('\n').forEach(line => {
+      const bold = (line.match(/\*\*/g) || []).length;
+      const rest = line.replace(/\*\*/g, '');
+      const censor = /[A-Za-z]\*[A-Za-z]/.test(rest);
+      const ital = (rest.replace(/[A-Za-z]\*[A-Za-z]/g, 'xx').match(/\*/g) || []).length;
+      const snip = line.replace(/\{[^}]*\}/g, '').trim().slice(0, 40);
+      if (bold % 2) issues.push(`Slide ${i + 1}: a ** (bold) mark has no partner — “${snip}…”`);
+      if (ital % 2) issues.push(`Slide ${i + 1}: a * (italic) mark has no partner — “${snip}…”`);
+      if (censor) issues.push(`Slide ${i + 1}: a * inside a word will turn the rest of the line italic — use ∗ instead`);
+    });
   });
   if (!pieceTitle.trim()) issues.push('No Piece Title yet');
   if (!publishCategory.trim()) issues.push('No Category yet');
