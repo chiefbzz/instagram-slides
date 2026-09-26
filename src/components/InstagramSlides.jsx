@@ -53,7 +53,7 @@ Because while you excel at gardening and math and public speaking, I possess eli
 {s}Dave Balter, June 2026`;
 
 const WRITING = {
-  buttondown: 'https://buttondown.com/balter/archive/',
+  substack: 'https://drclot.substack.com/welcome',
   medium: 'https://medium.com/@davebalter',
   instagram: 'https://www.instagram.com/baltererer/',
 };
@@ -61,6 +61,60 @@ const WRITING = {
 // davebalter.com browse categories (suggestions; free text is allowed for new ones).
 // Keep to 8 max — the homepage shows at most 8 category chips.
 const CATEGORIES = ['Work & Money', 'Vices', 'Music', 'Love & Family', 'Everyday Life', 'Grief & Loss', 'Writing', 'Identity & Belonging'];
+
+// One-record IndexedDB store for the autosaved draft. Every failure resolves quietly:
+// a private window or blocked storage just means no autosave, never a broken tool.
+function draftStore(op, value) {
+  return new Promise(resolve => {
+    try {
+      const open = indexedDB.open('storyshelf', 1);
+      open.onupgradeneeded = () => open.result.createObjectStore('drafts');
+      open.onerror = () => resolve(null);
+      open.onsuccess = () => {
+        const db = open.result;
+        const tx = db.transaction('drafts', op === 'get' ? 'readonly' : 'readwrite');
+        const store = tx.objectStore('drafts');
+        const req = op === 'get' ? store.get('current') : op === 'put' ? store.put(value, 'current') : store.delete('current');
+        req.onsuccess = () => resolve(op === 'get' ? req.result : true);
+        req.onerror = () => resolve(null);
+      };
+    } catch { resolve(null); }
+  });
+}
+
+// Things worth a second look before a story goes to the site and on to Substack,
+// Buttondown and LinkedIn. Flags only — the writer's text is never changed.
+function prepublishChecks({ essay, pieceTitle, publishDate, publishCategory }) {
+  const issues = [];
+  const slides = essay.split('///').map(s => s.trim()).filter(Boolean);
+  slides.forEach((slide, i) => {
+    const text = slide
+      .replace(/\{[slxc]\}|\{#[0-9a-fA-F]{3,6}\}|\{\/\}|\^\^\^/g, '')
+      .replace(/https?:\/\/\S+|\S+\.(com|org|net|io|co|vc|ai|app)\b\S*/gi, ' ');
+    // punctuation with a letter straight after it: "Warehouse,because", "end.Then"
+    const re = /([A-Za-z][,;:!?])([A-Za-z])|([a-z]\.)([A-Z][a-z])/g;
+    let m;
+    while ((m = re.exec(text))) {
+      const at = m.index;
+      const snip = text.slice(Math.max(0, at - 18), at + 22).replace(/\s+/g, ' ').trim();
+      if (/\b(e\.g|i\.e|a\.m|p\.m|U\.S)\b/i.test(snip)) continue;
+      issues.push(`Slide ${i + 1}: no space after punctuation — “…${snip}…”`);
+    }
+    const bold = (slide.match(/\*\*/g) || []).length;
+    const ital = (slide.replace(/\*\*/g, '').match(/\*/g) || []).length;
+    if (bold % 2) issues.push(`Slide ${i + 1}: a ** (bold) mark has no partner`);
+    if (ital % 2) issues.push(`Slide ${i + 1}: a * (italic) mark has no partner`);
+    const opens = (slide.match(/\{#[0-9a-fA-F]{3,6}\}/g) || []).length, closes = (slide.match(/\{\/\}/g) || []).length;
+    if (opens !== closes) issues.push(`Slide ${i + 1}: a {#color} has no matching {/}`);
+  });
+  if (!pieceTitle.trim()) issues.push('No Piece Title yet');
+  if (!publishCategory.trim()) issues.push('No Category yet');
+  if (publishDate) {
+    const d = new Date(publishDate + 'T12:00:00');
+    if (d.getDay() !== 2) issues.push(`Publish date ${publishDate} is a ${d.toLocaleDateString('en-US', { weekday: 'long' })}, not a Tuesday`);
+  }
+  return issues;
+}
 
 // Hand-picked "gateway" pieces — the front doors shown to new tool users.
 // The thank-you card rotates through these on each visit.
@@ -123,6 +177,53 @@ export default function InstagramSlides() {
   const [importStatus, setImportStatus] = useState(''); // '', 'loading', 'loaded', or 'error: ...'
   const [suggestedPalettes, setSuggestedPalettes] = useState([]);
   const [paletteStatus, setPaletteStatus] = useState(''); // '', 'loading', or 'error: ...'
+  const [linkedinCopied, setLinkedinCopied] = useState('');
+  const [prepubIssues, setPrepubIssues] = useState(null); // null = not checked; [] = clean; [...] = shown before publishing
+  const [posts, setPosts] = useState(null);             // drafted post copy from /api/posts
+  const [postsStatus, setPostsStatus] = useState('');   // '', 'loading', or 'error: ...'
+  const [postCopied, setPostCopied] = useState('');
+  const [draftRestored, setDraftRestored] = useState(''); // '' or when the restored draft was saved
+  const draftReady = useRef(false); // no saving until the saved draft has been read back
+
+  // --- Autosave ---------------------------------------------------------------
+  // A story lived only in the open tab; a closed tab or a refresh lost it. The draft
+  // (text, title, style, photos, publish fields) is kept in IndexedDB, which has room
+  // for photos where localStorage does not, and restored when the tool reopens.
+  useEffect(() => {
+    let cancelled = false;
+    draftStore('get').then(d => {
+      if (cancelled) return;
+      if (d && (d.essay || '').trim() && !(essay || '').trim()) {
+        setPieceTitle(d.pieceTitle || '');
+        setEssay(d.essay);
+        if (d.styles) setStyles(d.styles);
+        if (d.insertedImages) setInsertedImages(d.insertedImages);
+        if (d.publishDate) setPublishDate(d.publishDate);
+        setPublishCategory(d.publishCategory || '');
+        setPublishEngagement(d.publishEngagement || '');
+        setPublishSlug(d.publishSlug || '');
+        setDraftRestored(d.savedAt || 'earlier');
+      }
+    }).finally(() => { draftReady.current = true; });
+    return () => { cancelled = true; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!draftReady.current) return;
+    const t = setTimeout(() => {
+      if (!essay.trim() && !pieceTitle.trim()) { draftStore('del'); return; }
+      draftStore('put', { pieceTitle, essay, styles, insertedImages, publishDate, publishCategory,
+                          publishEngagement, publishSlug, savedAt: new Date().toLocaleString() });
+    }, 800);
+    return () => clearTimeout(t);
+  }, [pieceTitle, essay, styles, insertedImages, publishDate, publishCategory, publishEngagement, publishSlug]);
+
+  const startFresh = () => {
+    draftStore('del');
+    setPieceTitle(''); setEssay(''); setSlides([]); setInsertedImages({});
+    setPublishCategory(''); setPublishEngagement(''); setPublishSlug(''); setPublishStatus('');
+    setPrepubIssues(null); setPosts(null); setDraftRestored('');
+  };
   const canvasRef = useRef(null);
   const fileInputRefs = useRef({});
 
@@ -359,14 +460,59 @@ export default function InstagramSlides() {
       } else {
         await navigator.clipboard.writeText(plain);
       }
+      const tag = publishUnlocked && publishCategory.trim() ? ` — tag it “${publishCategory.trim()}”` : '';
       setSubstackCopied(hasImages && !hosted
         ? '✓ copied — but publish to davebalter.com first so the photos come through'
-        : '✓ copied — paste into a new Substack draft');
+        : `✓ copied — paste into a new Substack draft${tag}`);
       setTimeout(() => setSubstackCopied(''), 4000);
     } catch (err) {
       setSubstackCopied('error: ' + err.message);
       setTimeout(() => setSubstackCopied(''), 4000);
     }
+  };
+
+  // The newsletter-article version for LinkedIn: same prose and photos as the Substack
+  // copy. In Dave's own (unlocked) mode it closes with the line pointing to Substack.
+  const copyForLinkedin = async () => {
+    const { html, plain } = essayToSubstack();
+    if (!plain.trim()) { setLinkedinCopied('error: paste your essay first'); setTimeout(() => setLinkedinCopied(''), 2500); return; }
+    const cta = publishUnlocked
+      ? `<hr><p><em>These come by email every Tuesday. If you’d rather not depend on LinkedIn’s mood: <a href="${WRITING.substack}">drclot.substack.com</a></em></p>`
+      : '';
+    const ctaPlain = publishUnlocked ? `\n\nThese come by email every Tuesday. If you’d rather not depend on LinkedIn’s mood: drclot.substack.com` : '';
+    try {
+      await navigator.clipboard.write([new ClipboardItem({
+        'text/html': new Blob([html + cta], { type: 'text/html' }),
+        'text/plain': new Blob([plain + ctaPlain], { type: 'text/plain' }),
+      })]);
+      setLinkedinCopied('✓ copied — paste into a LinkedIn article (title goes in its own field)');
+    } catch (err) { setLinkedinCopied('error: ' + err.message); }
+    setTimeout(() => setLinkedinCopied(''), 4000);
+  };
+
+  // Drafts the week's surrounding copy — LinkedIn carousel post, first comment, Instagram
+  // caption, Substack subtitle, and the LinkedIn newsletter share line — in Dave's voice.
+  const writePosts = async () => {
+    const text = getPlainText();
+    if (!text.trim()) { setPostsStatus('error: paste your essay first'); return; }
+    setPostsStatus('loading'); setPosts(null);
+    try {
+      const res = await fetch('/api/posts', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ passphrase: publishPass, title: pieceTitle.trim(), text }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        if (res.status === 401) { setPublishUnlocked(false); localStorage.removeItem('davebalter_pass'); }
+        setPostsStatus('error: ' + (data.error || 'could not write the posts')); return;
+      }
+      setPosts(data.posts); setPostsStatus('');
+    } catch (err) { setPostsStatus('error: ' + err.message); }
+  };
+
+  const copyPost = (key, value) => {
+    navigator.clipboard.writeText(value);
+    setPostCopied(key); setTimeout(() => setPostCopied(''), 1800);
   };
 
   const suggestPalettes = async () => {
@@ -980,9 +1126,14 @@ ${slideText}`;
     }
   };
 
-  const publishToDavebalter = async () => {
+  const publishToDavebalter = async (force = false) => {
     if (!pieceTitle.trim()) { setPublishStatus('error: add a Piece Title first (used for the title and URL)'); return; }
     if (!publishCategory.trim()) { setPublishStatus('error: pick a Category first (so it lands in the right filter on the site)'); return; }
+    if (!force) {
+      const issues = prepublishChecks({ essay, pieceTitle, publishDate, publishCategory });
+      if (issues.length) { setPrepubIssues(issues); return; }
+    }
+    setPrepubIssues(null);
     setPublishStatus('publishing');
     setPublishUrl('');
     try {
@@ -1310,15 +1461,29 @@ ${slideText}`;
           >
             <Copy className="w-3 h-3 mr-1" />Copy for Substack
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={copyForLinkedin}
+            title="Copy the piece as a LinkedIn newsletter article, with photos"
+          >
+            <Copy className="w-3 h-3 mr-1" />Copy for LinkedIn
+          </Button>
           <Button size="sm" onClick={generateSlides}>
             Generate Slides
           </Button>
-          {substackCopied && (
-            <span className={`text-xs ${substackCopied.startsWith('error') ? 'text-red-500' : 'text-gray-500'}`}>
-              {substackCopied.replace(/^error: /, '')}
+          {(substackCopied || linkedinCopied) && (
+            <span className={`text-xs ${(substackCopied || linkedinCopied).startsWith('error') ? 'text-red-500' : 'text-gray-500'}`}>
+              {(substackCopied || linkedinCopied).replace(/^error: /, '')}
             </span>
           )}
         </div>
+        {draftRestored && (
+          <div className="mb-2 text-xs" style={{ color: '#8a8880' }}>
+            Restored your draft from {draftRestored}.{' '}
+            <button onClick={startFresh} className="underline">Start fresh</button>
+          </div>
+        )}
         {showPlainText ? (
           <pre className="w-full h-64 mb-4 p-3 border rounded-md bg-gray-50 overflow-auto whitespace-pre-wrap text-sm">{getPlainText()}</pre>
         ) : (
@@ -1435,8 +1600,8 @@ ${slideText}`;
           {/* Subscribe (primary) + quiet secondary links */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <Button asChild>
-              <a href={WRITING.buttondown} target="_blank" rel="noopener noreferrer">
-                Subscribe on Buttondown
+              <a href={WRITING.substack} target="_blank" rel="noopener noreferrer">
+                Subscribe on Substack
                 <ArrowUpRight className="w-4 h-4 ml-2" />
               </a>
             </Button>
@@ -1752,7 +1917,7 @@ ${slideText}`;
               </div>
               <div className="flex items-center gap-3">
                 <Button
-                  onClick={publishToDavebalter}
+                  onClick={() => publishToDavebalter(false)}
                   disabled={publishStatus === 'publishing' || !pieceTitle.trim() || !publishCategory.trim()}
                   style={{ background: '#1a1916', color: 'white' }}
                   className="hover:opacity-90"
@@ -1769,6 +1934,18 @@ ${slideText}`;
                   lock
                 </button>
               </div>
+              {prepubIssues && prepubIssues.length > 0 && (
+                <div className="mt-3 p-3 rounded-md border border-amber-200 bg-amber-50 text-sm">
+                  <p className="font-medium text-amber-800 mb-1">Worth a look before publishing:</p>
+                  <ul className="list-disc ml-5 text-amber-800 space-y-0.5">
+                    {prepubIssues.map((x, i) => <li key={i}>{x}</li>)}
+                  </ul>
+                  <div className="mt-2 flex gap-3">
+                    <Button size="sm" variant="outline" onClick={() => setPrepubIssues(null)}>Fix first</Button>
+                    <Button size="sm" onClick={() => publishToDavebalter(true)} style={{ background: '#1a1916', color: 'white' }}>Publish anyway</Button>
+                  </div>
+                </div>
+              )}
               {!pieceTitle.trim() && (
                 <p className="mt-2 text-xs text-amber-600">Add a Piece Title above first — it becomes the essay title and URL.</p>
               )}
@@ -1784,6 +1961,40 @@ ${slideText}`;
               {publishStatus.startsWith('error') && (
                 <p className="mt-3 text-sm text-red-600">{publishStatus.replace(/^error:\s*/, '')}</p>
               )}
+
+              {/* Write the posts: the week's surrounding copy, drafted in Dave's voice */}
+              <div className="mt-6 pt-4 border-t border-gray-100">
+                <div className="flex items-center gap-3">
+                  <Button variant="outline" onClick={writePosts} disabled={postsStatus === 'loading'}>
+                    {postsStatus === 'loading'
+                      ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Writing…</>)
+                      : (<><PenLine className="w-4 h-4 mr-2" />Write the posts</>)}
+                  </Button>
+                  <span className="text-xs" style={{ color: '#8a8880' }}>LinkedIn post · first comment · Instagram caption · Substack subtitle · newsletter share</span>
+                </div>
+                {postsStatus.startsWith('error') && <p className="mt-2 text-sm text-red-600">{postsStatus.replace(/^error:\s*/, '')}</p>}
+                {posts && (
+                  <div className="mt-4 space-y-3">
+                    {[
+                      ...(posts.linkedin_posts || []).map((v, i) => [`li${i}`, `LinkedIn carousel post — option ${String.fromCharCode(65 + i)}`, v]),
+                      ['comment', 'LinkedIn first comment (post right after the carousel goes live)', posts.linkedin_first_comment],
+                      ['ig', 'Instagram caption', posts.instagram_caption],
+                      ['subtitle', 'Substack subtitle', posts.substack_subtitle],
+                      ['share', 'LinkedIn newsletter — “tell your network” line', posts.newsletter_share],
+                    ].filter(([, , v]) => v).map(([key, label, value]) => (
+                      <div key={key} className="p-3 border rounded-md bg-gray-50">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-medium" style={{ color: '#6b6860' }}>{label}</span>
+                          <button onClick={() => copyPost(key, value)} className="text-xs underline" style={{ color: '#8a8880' }}>
+                            {postCopied === key ? 'copied' : 'copy'}
+                          </button>
+                        </div>
+                        <p className="text-sm whitespace-pre-wrap" style={{ color: '#1a1916' }}>{value}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -1798,7 +2009,7 @@ ${slideText}`;
         <p className="text-xs" style={{ color: '#b3b0a8' }}>
           Dave Balter
           {' · '}
-          <a href={WRITING.buttondown} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-[#6b6860] transition-colors">Buttondown</a>
+          <a href={WRITING.substack} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-[#6b6860] transition-colors">Substack</a>
           {' · '}
           <a href={WRITING.medium} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-[#6b6860] transition-colors">Medium</a>
           {' · '}
