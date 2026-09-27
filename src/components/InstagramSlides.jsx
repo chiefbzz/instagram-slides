@@ -289,7 +289,7 @@ export default function InstagramSlides() {
   const catalogFlags = (r) => {
     const f = [];
     if (r.site && !r.substack) f.push(r.site === 'scheduled' ? 'Substack at publish' : 'not on Substack');
-    if (!r.site) f.push(r.queued ? 'in the archive queue' : 'not on the site');
+    if (!r.site) f.push(r.substackOnly ? '' : r.queued ? 'in the archive queue' : 'not on the site');
     if (r.site && r.substack && r.category && !r.tags.includes(r.category)) f.push('tag ≠ category');
     if (r.site && !r.category) f.push('no category');
     return f;
@@ -300,7 +300,7 @@ export default function InstagramSlides() {
     return catalog.rows.filter(r => {
       if (q && !`${r.title} ${r.substack || ''} ${r.folder || ''}`.toLowerCase().includes(q)) return false;
       if (catalogFilter === 'nosub') return r.site && !r.substack;
-      if (catalogFilter === 'nosite') return !r.site;
+      if (catalogFilter === 'nosite') return !r.site && !r.substackOnly;
       if (catalogFilter === 'tag') return r.site && ((r.substack && r.category && !r.tags.includes(r.category)) || !r.category);
       if (catalogFilter === 'scheduled') return r.site === 'scheduled';
       return true;
@@ -2216,7 +2216,7 @@ ${slideText}`;
               <div className="flex flex-wrap items-center gap-2 mb-2">
                 {[['all', 'All'], ['nosub', 'Not on Substack'], ['nosite', 'Not on the site'], ['tag', 'Tag / category issues'], ['scheduled', 'Scheduled']].map(([k, label]) => {
                   const n = k === 'all' ? catalog.rows.length : catalog.rows.filter(r =>
-                    k === 'nosub' ? r.site && !r.substack : k === 'nosite' ? !r.site : k === 'scheduled' ? r.site === 'scheduled'
+                    k === 'nosub' ? r.site && !r.substack : k === 'nosite' ? !r.site && !r.substackOnly : k === 'scheduled' ? r.site === 'scheduled'
                       : r.site && ((r.substack && r.category && !r.tags.includes(r.category)) || !r.category)).length;
                   return (
                     <Button key={k} size="sm" variant={catalogFilter === k ? 'default' : 'outline'} onClick={() => setCatalogFilter(k)}>
@@ -2257,7 +2257,7 @@ ${slideText}`;
                             {r.tags.length > 0 && <span className="block text-[11px]" style={{ color: '#b3b0a8' }}>{r.tags.join(', ')}</span>}
                           </td>
                           <td className="p-2 text-xs" style={{ color: '#6b6860' }}>{r.site ? r.photos : ''}</td>
-                          <td className="p-2 text-xs text-amber-700">{flags.join(' · ')}</td>
+                          <td className="p-2 text-xs text-amber-700">{r.substackOnly ? <span style={{ color: '#b3b0a8' }}>Substack only, by choice</span> : flags.filter(Boolean).join(' · ')}</td>
                           <td className="p-2 whitespace-nowrap">
                             {r.siteSlug
                               ? <Button size="sm" variant="outline" onClick={() => { setCatalogOpen(false); importFromDavebalter(r.siteSlug); }}>Edit</Button>
