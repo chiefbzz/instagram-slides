@@ -1540,12 +1540,17 @@ ${slideText}`;
             </span>
           )}
         </div>
-        {draftRestored && (
+        {draftRestored ? (
           <div className="mb-2 text-xs" style={{ color: '#8a8880' }}>
             Restored your draft from {draftRestored}.{' '}
             <button onClick={startFresh} className="underline">Start fresh</button>
           </div>
-        )}
+        ) : (essay.trim() || pieceTitle.trim()) ? (
+          <div className="mb-2 text-xs" style={{ color: '#b3b0a8' }}>
+            Saved as you go.{' '}
+            <button onClick={startFresh} className="underline">New story</button>
+          </div>
+        ) : null}
         {showPlainText ? (
           <pre className="w-full h-64 mb-4 p-3 border rounded-md bg-gray-50 overflow-auto whitespace-pre-wrap text-sm">{getPlainText()}</pre>
         ) : (
