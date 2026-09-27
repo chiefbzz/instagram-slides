@@ -199,6 +199,12 @@ export default function InstagramSlides() {
   const [archiveStory, setArchiveStory] = useState(null); // the loaded story's originals + photos
   const [archiveStatus, setArchiveStatus] = useState('');
   const [photoSpot, setPhotoSpot] = useState({});         // photo file -> "after slide" input
+  // Catalog: every story across the site, Substack and the archive (from the bridge's /catalog)
+  const [catalogOpen, setCatalogOpen] = useState(false);
+  const [catalog, setCatalog] = useState(null);
+  const [catalogStatus, setCatalogStatus] = useState('');
+  const [catalogFilter, setCatalogFilter] = useState('all');
+  const [catalogSearch, setCatalogSearch] = useState('');
 
   // --- Autosave ---------------------------------------------------------------
   // A story lived only in the open tab; a closed tab or a refresh lost it. The draft
@@ -266,6 +272,39 @@ export default function InstagramSlides() {
       setArchiveStory(s);
       setArchiveStatus(s.desktopReadable ? '' : 'error: the Desktop folder isn’t readable right now (macOS permission) — text loaded, no images');
     } catch (err) { setArchiveStatus('error: ' + err.message); }
+  };
+
+  const openCatalog = async () => {
+    setCatalogOpen(true);
+    setCatalogStatus('loading');
+    try {
+      const d = await (await fetch(`${BRIDGE}/catalog`)).json();
+      if (!d.ok) { setCatalogStatus('error: ' + d.error); return; }
+      setCatalog(d); setCatalogStatus('');
+    } catch (err) { setCatalogStatus('error: the archive bridge isn’t answering (' + err.message + ')'); }
+  };
+
+  // What each row still needs. Site stories should be on Substack with a tag that matches
+  // their category; Substack-only and archive stories still need the site.
+  const catalogFlags = (r) => {
+    const f = [];
+    if (r.site && !r.substack) f.push(r.site === 'scheduled' ? 'Substack at publish' : 'not on Substack');
+    if (!r.site) f.push(r.queued ? 'in the archive queue' : 'not on the site');
+    if (r.site && r.substack && r.category && !r.tags.includes(r.category)) f.push('tag ≠ category');
+    if (r.site && !r.category) f.push('no category');
+    return f;
+  };
+  const catalogRows = () => {
+    if (!catalog) return [];
+    const q = catalogSearch.trim().toLowerCase();
+    return catalog.rows.filter(r => {
+      if (q && !`${r.title} ${r.substack || ''} ${r.folder || ''}`.toLowerCase().includes(q)) return false;
+      if (catalogFilter === 'nosub') return r.site && !r.substack;
+      if (catalogFilter === 'nosite') return !r.site;
+      if (catalogFilter === 'tag') return r.site && ((r.substack && r.category && !r.tags.includes(r.category)) || !r.category);
+      if (catalogFilter === 'scheduled') return r.site === 'scheduled';
+      return true;
+    });
   };
 
   const placeArchivePhoto = (photo) => {
@@ -1110,14 +1149,16 @@ ${slideText}`;
   const tripleToHex = (t) => '#' + (t || '').split(',').map(n => (parseInt(n, 10) || 0).toString(16).padStart(2, '0')).join('');
 
   // Pull a published story back into the editor so it can be edited and re-published.
-  const importFromDavebalter = async () => {
-    if (!importSlug.trim()) { setImportStatus('error: enter a story slug or davebalter.com link'); return; }
+  const importFromDavebalter = async (slugArg) => {
+    const wanted = (typeof slugArg === 'string' ? slugArg : importSlug).trim();
+    if (typeof slugArg === 'string') setImportSlug(slugArg);
+    if (!wanted) { setImportStatus('error: enter a story slug or davebalter.com link'); return; }
     setImportStatus('loading');
     try {
       const res = await fetch('/api/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ passphrase: publishPass, slug: importSlug.trim() }),
+        body: JSON.stringify({ passphrase: publishPass, slug: wanted }),
       });
       const data = await res.json();
       if (!data.success) {
@@ -1944,9 +1985,12 @@ ${slideText}`;
               {/* Archive: the unpublished slide-stories, served from Dave's Mac */}
               {archiveQueue && (
                 <div className="mb-4 pb-4 border-b border-gray-100">
-                  <div className="flex items-baseline justify-between mb-2">
+                  <div className="flex items-baseline justify-between mb-2 gap-3">
                     <label className="text-xs font-medium" style={{ color: '#6b6860' }}>From the archive — {archiveQueue.length} stories still to place, oldest first</label>
-                    <button onClick={fetchArchiveQueue} className="text-xs underline" style={{ color: '#b3b0a8' }}>refresh</button>
+                    <span className="flex gap-3 shrink-0">
+                      <button onClick={openCatalog} className="text-xs underline font-medium" style={{ color: '#1a1916' }}>Catalog</button>
+                      <button onClick={fetchArchiveQueue} className="text-xs underline" style={{ color: '#b3b0a8' }}>refresh</button>
+                    </span>
                   </div>
                   <div className="space-y-1">
                     {(archiveShowAll ? archiveQueue : archiveQueue.slice(0, 6)).map(q => (
@@ -2155,6 +2199,83 @@ ${slideText}`;
       </footer>
 
       {/* Preview Modal */}
+      <Dialog open={catalogOpen} onOpenChange={setCatalogOpen}>
+        <DialogContent className="max-w-6xl w-[95vw] max-h-[88vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Mostly True Stories — Catalog</DialogTitle>
+            <DialogDescription>
+              {catalog
+                ? `${catalog.rows.length} stories · ${catalog.siteCount} on davebalter.com · ${catalog.substackCount} on Substack · ${catalog.queueCount} in the archive queue`
+                : 'Every story across the site, Substack and the archive.'}
+            </DialogDescription>
+          </DialogHeader>
+          {catalogStatus === 'loading' && <p className="text-sm" style={{ color: '#8a8880' }}><Loader2 className="w-4 h-4 mr-2 inline animate-spin" />Reading the site, the archive and Substack…</p>}
+          {catalogStatus.startsWith('error') && <p className="text-sm text-red-600">{catalogStatus.replace(/^error:\s*/, '')}</p>}
+          {catalog && (
+            <>
+              <div className="flex flex-wrap items-center gap-2 mb-2">
+                {[['all', 'All'], ['nosub', 'Not on Substack'], ['nosite', 'Not on the site'], ['tag', 'Tag / category issues'], ['scheduled', 'Scheduled']].map(([k, label]) => {
+                  const n = k === 'all' ? catalog.rows.length : catalog.rows.filter(r =>
+                    k === 'nosub' ? r.site && !r.substack : k === 'nosite' ? !r.site : k === 'scheduled' ? r.site === 'scheduled'
+                      : r.site && ((r.substack && r.category && !r.tags.includes(r.category)) || !r.category)).length;
+                  return (
+                    <Button key={k} size="sm" variant={catalogFilter === k ? 'default' : 'outline'} onClick={() => setCatalogFilter(k)}>
+                      {label} · {n}
+                    </Button>
+                  );
+                })}
+                <Input value={catalogSearch} onChange={e => setCatalogSearch(e.target.value)} placeholder="search title or folder" className="w-56 h-8 ml-auto" />
+                <button onClick={openCatalog} className="text-xs underline" style={{ color: '#8a8880' }}>refresh</button>
+              </div>
+              <div className="overflow-auto border rounded-md">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-gray-50 text-xs" style={{ color: '#6b6860' }}>
+                    <tr>
+                      <th className="text-left p-2">Story</th><th className="text-left p-2">Date</th><th className="text-left p-2">Category</th>
+                      <th className="text-left p-2">Site</th><th className="text-left p-2">Substack</th><th className="text-left p-2">Photos</th>
+                      <th className="text-left p-2">Needs</th><th className="p-2"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {catalogRows().map((r, i) => {
+                      const flags = catalogFlags(r);
+                      return (
+                        <tr key={(r.siteSlug || r.substackSlug || r.folder || '') + i} className="border-t align-top">
+                          <td className="p-2" style={{ color: '#1a1916' }}>
+                            {r.title}
+                            {r.substack && r.substack !== r.title && <span className="block text-xs" style={{ color: '#8a8880' }}>Substack: {r.substack}</span>}
+                            {r.folder && <span className="block text-[11px]" style={{ color: '#b3b0a8' }}>{r.folder}</span>}
+                          </td>
+                          <td className="p-2 whitespace-nowrap text-xs" style={{ color: '#6b6860' }}>{r.date}</td>
+                          <td className="p-2 text-xs" style={{ color: '#6b6860' }}>{r.category || (r.tags[0] ? <span style={{ color: '#b3b0a8' }}>{r.tags[0]} (tag)</span> : '—')}</td>
+                          <td className="p-2 text-xs">
+                            {r.site === 'live' ? <a href={`https://davebalter.com/?essay=${r.siteSlug}`} target="_blank" rel="noopener noreferrer" className="text-green-700 underline">live</a>
+                              : r.site === 'scheduled' ? <span className="text-amber-700">scheduled</span> : <span style={{ color: '#b3b0a8' }}>—</span>}
+                          </td>
+                          <td className="p-2 text-xs">
+                            {r.substackSlug ? <a href={`https://drclot.substack.com/p/${r.substackSlug}`} target="_blank" rel="noopener noreferrer" className="text-green-700 underline">yes</a> : <span style={{ color: '#b3b0a8' }}>—</span>}
+                            {r.tags.length > 0 && <span className="block text-[11px]" style={{ color: '#b3b0a8' }}>{r.tags.join(', ')}</span>}
+                          </td>
+                          <td className="p-2 text-xs" style={{ color: '#6b6860' }}>{r.site ? r.photos : ''}</td>
+                          <td className="p-2 text-xs text-amber-700">{flags.join(' · ')}</td>
+                          <td className="p-2 whitespace-nowrap">
+                            {r.siteSlug
+                              ? <Button size="sm" variant="outline" onClick={() => { setCatalogOpen(false); importFromDavebalter(r.siteSlug); }}>Edit</Button>
+                              : r.queued && r.folder
+                                ? <Button size="sm" variant="outline" onClick={() => { setCatalogOpen(false); loadArchiveStory(r.folder); }}>Load</Button>
+                                : null}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={preview.show} onOpenChange={show => setPreview({ ...preview, show })}>
         <DialogContent className="max-w-4xl">
           <DialogHeader>
