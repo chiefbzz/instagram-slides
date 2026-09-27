@@ -191,6 +191,14 @@ export default function InstagramSlides() {
   const [postCopied, setPostCopied] = useState('');
   const [draftRestored, setDraftRestored] = useState(''); // '' or when the restored draft was saved
   const draftReady = useRef(false); // no saving until the saved draft has been read back
+  // Archive: the unpublished slide-stories on Dave's Mac, served by scripts/archive-bridge.py
+  // in the davebalter repo. Only reachable from his own machine, only when it's running.
+  const [storyFolder, setStoryFolder] = useState('');   // archive folder this story came from (written as `folder:`)
+  const [archiveQueue, setArchiveQueue] = useState(null); // null = bridge not reached
+  const [archiveShowAll, setArchiveShowAll] = useState(false);
+  const [archiveStory, setArchiveStory] = useState(null); // the loaded story's originals + photos
+  const [archiveStatus, setArchiveStatus] = useState('');
+  const [photoSpot, setPhotoSpot] = useState({});         // photo file -> "after slide" input
 
   // --- Autosave ---------------------------------------------------------------
   // A story lived only in the open tab; a closed tab or a refresh lost it. The draft
@@ -209,6 +217,7 @@ export default function InstagramSlides() {
         setPublishCategory(d.publishCategory || '');
         setPublishEngagement(d.publishEngagement || '');
         setPublishSlug(d.publishSlug || '');
+        setStoryFolder(d.storyFolder || '');
         setDraftRestored(d.savedAt || 'earlier');
       }
     }).finally(() => { draftReady.current = true; });
@@ -220,12 +229,54 @@ export default function InstagramSlides() {
     const t = setTimeout(() => {
       if (!essay.trim() && !pieceTitle.trim()) { draftStore('del'); return; }
       draftStore('put', { pieceTitle, essay, styles, insertedImages, publishDate, publishCategory,
-                          publishEngagement, publishSlug, savedAt: new Date().toLocaleString() });
+                          publishEngagement, publishSlug, storyFolder, savedAt: new Date().toLocaleString() });
     }, 800);
     return () => clearTimeout(t);
-  }, [pieceTitle, essay, styles, insertedImages, publishDate, publishCategory, publishEngagement, publishSlug]);
+  }, [pieceTitle, essay, styles, insertedImages, publishDate, publishCategory, publishEngagement, publishSlug, storyFolder]);
+
+  // --- Archive ----------------------------------------------------------------
+  const BRIDGE = 'http://127.0.0.1:4178';
+  const fetchArchiveQueue = useCallback(async () => {
+    try {
+      const r = await fetch(`${BRIDGE}/queue`);
+      const d = await r.json();
+      setArchiveQueue(d.ok ? d.queue : null);
+    } catch { setArchiveQueue(null); } // bridge not running: the section simply doesn't show
+  }, []);
+  useEffect(() => { if (publishUnlocked) fetchArchiveQueue(); }, [publishUnlocked, fetchArchiveQueue]);
+
+  const loadArchiveStory = async (folder) => {
+    setArchiveStatus(`loading ${folder}…`);
+    try {
+      const d = await (await fetch(`${BRIDGE}/story?folder=${encodeURIComponent(folder)}`)).json();
+      if (!d.ok) { setArchiveStatus('error: ' + d.error); return; }
+      const s = d.story;
+      setPieceTitle(s.substack || s.title || '');
+      setEssay(s.text);
+      setSlides(s.text.split('///').map(x => x.trim()).filter(Boolean));
+      setPublishDate(s.date && s.date >= '2024-12-01' ? s.date : new Date().toISOString().slice(0, 10));
+      setPublishCategory(''); setPublishEngagement(''); setPublishSlug(''); setPublishStatus('');
+      setStoryFolder(s.folder);
+      setInsertedImages({});
+      setPhotoSpot({});
+      setPrepubIssues(null); setPosts(null); setDraftRestored('');
+      if (s.palette) setStyles(prev => ({ ...prev, colors: {
+        gradientStart: tripleToHex(s.palette.top), gradientMiddle: tripleToHex(s.palette.mid),
+        gradientEnd: tripleToHex(s.palette.bot), text: tripleToHex(s.palette.ink) }, slideSpecific: {} }));
+      setArchiveStory(s);
+      setArchiveStatus(s.desktopReadable ? '' : 'error: the Desktop folder isn’t readable right now (macOS permission) — text loaded, no images');
+    } catch (err) { setArchiveStatus('error: ' + err.message); }
+  };
+
+  const placeArchivePhoto = (photo) => {
+    const n = parseInt(photoSpot[photo.file], 10);
+    if (Number.isNaN(n) || n < 0) return;
+    setInsertedImages(prev => ({ ...prev, [n]: [...(prev[n] || []), photo.img] }));
+    setPhotoSpot(prev => ({ ...prev, [photo.file]: '' }));
+  };
 
   const startFresh = () => {
+    setStoryFolder(''); setArchiveStory(null);
     draftStore('del');
     setPieceTitle(''); setEssay(''); setSlides([]); setInsertedImages({});
     setPublishCategory(''); setPublishEngagement(''); setPublishSlug(''); setPublishStatus('');
@@ -1034,6 +1085,7 @@ ${slideText}`;
     const fm = [
       '---',
       `title: ${pieceTitle.trim()}`,
+      ...(storyFolder ? [`folder: ${storyFolder}`] : []),
       `category: ${publishCategory.trim()}`,
       `date: ${publishDate}`,
       `font: ${styles.fontFamily}`,
@@ -1096,6 +1148,8 @@ ${slideText}`;
       if (fm.date) setPublishDate(fm.date);
       setPublishEngagement(fm.engagement ? String(parseInt(fm.engagement, 10) || 0) : '');
       setPublishCategory(fm.category || '');
+      setStoryFolder(fm.folder || ''); // keep it, or re-publishing would drop the archive link
+      setArchiveStory(null);
 
       // Restore font + colors.
       setStyles(prev => ({
@@ -1181,6 +1235,7 @@ ${slideText}`;
       if (data.success) {
         setPublishStatus('success');
         setPublishUrl(data.url);
+        if (storyFolder) setTimeout(fetchArchiveQueue, 1500);
       } else {
         if (res.status === 401) { setPublishUnlocked(false); localStorage.removeItem('davebalter_pass'); }
         setPublishStatus('error: ' + (data.error || 'publish failed'));
@@ -1881,6 +1936,76 @@ ${slideText}`;
             </div>
           ) : (
             <div>
+              {/* Archive: the unpublished slide-stories, served from Dave's Mac */}
+              {archiveQueue && (
+                <div className="mb-4 pb-4 border-b border-gray-100">
+                  <div className="flex items-baseline justify-between mb-2">
+                    <label className="text-xs font-medium" style={{ color: '#6b6860' }}>From the archive — {archiveQueue.length} stories still to place, oldest first</label>
+                    <button onClick={fetchArchiveQueue} className="text-xs underline" style={{ color: '#b3b0a8' }}>refresh</button>
+                  </div>
+                  <div className="space-y-1">
+                    {(archiveShowAll ? archiveQueue : archiveQueue.slice(0, 6)).map(q => (
+                      <div key={q.folder} className={`flex items-center gap-3 text-sm px-2 py-1 rounded ${storyFolder === q.folder ? 'bg-amber-50' : ''}`}>
+                        <span className="w-24 shrink-0 text-xs" style={{ color: '#8a8880' }}>{q.date || 'no date'}</span>
+                        <span className="flex-1 truncate" style={{ color: '#1a1916' }}>
+                          {q.substack || q.title || <span style={{ color: '#b3b0a8' }}>untitled</span>}
+                          <span className="text-xs ml-2" style={{ color: '#b3b0a8' }}>{q.folder} · {q.slides} slides{q.substack ? ' · already on Substack' : ''}</span>
+                        </span>
+                        <Button size="sm" variant="outline" onClick={() => loadArchiveStory(q.folder)}>Load</Button>
+                      </div>
+                    ))}
+                  </div>
+                  {archiveQueue.length > 6 && (
+                    <button onClick={() => setArchiveShowAll(v => !v)} className="mt-1 text-xs underline" style={{ color: '#8a8880' }}>
+                      {archiveShowAll ? 'show fewer' : `show all ${archiveQueue.length}`}
+                    </button>
+                  )}
+                  {archiveStatus && (
+                    <p className={`mt-2 text-xs ${archiveStatus.startsWith('error') ? 'text-red-600' : ''}`} style={archiveStatus.startsWith('error') ? {} : { color: '#8a8880' }}>
+                      {archiveStatus.replace(/^error:\s*/, '')}
+                    </p>
+                  )}
+
+                  {archiveStory && storyFolder === archiveStory.folder && (
+                    <div className="mt-3 p-3 rounded-md bg-gray-50 border">
+                      <p className="text-xs mb-2" style={{ color: '#6b6860' }}>
+                        Loaded <span className="font-medium">{archiveStory.folder}</span>
+                        {archiveStory.substack && <> — already on Substack as “{archiveStory.substack}”, so it won’t need importing</>}.
+                        {' '}Pick a Category, check the text against your originals, then Generate Slides and Publish.
+                      </p>
+                      {archiveStory.slides.length > 0 && (
+                        <details open>
+                          <summary className="text-xs cursor-pointer" style={{ color: '#8a8880' }}>Your original slides ({archiveStory.slides.length})</summary>
+                          <div className="mt-2 grid grid-cols-4 gap-2">
+                            {archiveStory.slides.map((sl, i) => (
+                              <button key={sl.file} onClick={() => setPreview({ show: true, image: sl.img })} className="text-left">
+                                <img src={sl.img} alt={`original ${i + 1}`} className="w-full aspect-square object-cover rounded border" />
+                                <span className="text-[10px]" style={{ color: '#b3b0a8' }}>{i + 1} · {sl.file}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </details>
+                      )}
+                      {archiveStory.photos.length > 0 && (
+                        <details open className="mt-3">
+                          <summary className="text-xs cursor-pointer" style={{ color: '#8a8880' }}>Photos in the folder ({archiveStory.photos.length}) — choose where each goes (0 = cover)</summary>
+                          <div className="mt-2 space-y-2">
+                            {archiveStory.photos.map(ph => (
+                              <div key={ph.file} className="flex items-center gap-3">
+                                {ph.img ? <img src={ph.img} alt="" className="w-12 h-12 object-cover rounded border" /> : <div className="w-12 h-12 rounded border bg-white" />}
+                                <span className="flex-1 text-xs truncate" style={{ color: '#6b6860' }}>{ph.file}</span>
+                                <Input type="number" min="0" placeholder="after slide" value={photoSpot[ph.file] || ''} onChange={e => setPhotoSpot(prev => ({ ...prev, [ph.file]: e.target.value }))} className="w-28 h-8 text-xs" />
+                                <Button size="sm" variant="outline" onClick={() => placeArchivePhoto(ph)} disabled={!ph.img}>Add</Button>
+                              </div>
+                            ))}
+                          </div>
+                        </details>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Edit an existing story: pull it back into the editor */}
               <div className="mb-4 pb-4 border-b border-gray-100">
                 <label className="block text-xs mb-1" style={{ color: '#8a8880' }}>Edit an existing story — paste its slug or davebalter.com link</label>
