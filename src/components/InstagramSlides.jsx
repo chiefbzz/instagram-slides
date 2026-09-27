@@ -300,7 +300,8 @@ export default function InstagramSlides() {
     return catalog.rows.filter(r => {
       if (q && !`${r.title} ${r.substack || ''} ${r.folder || ''}`.toLowerCase().includes(q)) return false;
       if (catalogFilter === 'nosub') return r.site && !r.substack;
-      if (catalogFilter === 'nosite') return !r.site && !r.substackOnly;
+      if (catalogFilter === 'nosite') return !r.site && !r.substackOnly && !r.later;
+      if (catalogFilter === 'later') return !!r.later;
       if (catalogFilter === 'tag') return r.site && ((r.substack && r.category && !r.tags.includes(r.category)) || !r.category);
       if (catalogFilter === 'scheduled') return r.site === 'scheduled';
       return true;
@@ -2214,9 +2215,9 @@ ${slideText}`;
           {catalog && (
             <>
               <div className="flex flex-wrap items-center gap-2 mb-2">
-                {[['all', 'All'], ['nosub', 'Not on Substack'], ['nosite', 'Not on the site'], ['tag', 'Tag / category issues'], ['scheduled', 'Scheduled']].map(([k, label]) => {
+                {[['all', 'All'], ['nosub', 'Not on Substack'], ['nosite', 'Not on the site'], ['tag', 'Tag / category issues'], ['scheduled', 'Scheduled'], ['later', 'Look later']].map(([k, label]) => {
                   const n = k === 'all' ? catalog.rows.length : catalog.rows.filter(r =>
-                    k === 'nosub' ? r.site && !r.substack : k === 'nosite' ? !r.site && !r.substackOnly : k === 'scheduled' ? r.site === 'scheduled'
+                    k === 'later' ? !!r.later : k === 'nosub' ? r.site && !r.substack : k === 'nosite' ? !r.site && !r.substackOnly && !r.later : k === 'scheduled' ? r.site === 'scheduled'
                       : r.site && ((r.substack && r.category && !r.tags.includes(r.category)) || !r.category)).length;
                   return (
                     <Button key={k} size="sm" variant={catalogFilter === k ? 'default' : 'outline'} onClick={() => setCatalogFilter(k)}>
@@ -2257,7 +2258,7 @@ ${slideText}`;
                             {r.tags.length > 0 && <span className="block text-[11px]" style={{ color: '#b3b0a8' }}>{r.tags.join(', ')}</span>}
                           </td>
                           <td className="p-2 text-xs" style={{ color: '#6b6860' }}>{r.site ? r.photos : ''}</td>
-                          <td className="p-2 text-xs text-amber-700">{r.substackOnly ? <span style={{ color: '#b3b0a8' }}>Substack only, by choice</span> : flags.filter(Boolean).join(' · ')}</td>
+                          <td className="p-2 text-xs text-amber-700">{r.substackOnly ? <span style={{ color: '#b3b0a8' }}>Substack only, by choice</span> : r.later ? <span className="text-blue-700">look later — {r.later}</span> : flags.filter(Boolean).join(' · ')}</td>
                           <td className="p-2 whitespace-nowrap">
                             {r.siteSlug
                               ? <Button size="sm" variant="outline" onClick={() => { setCatalogOpen(false); importFromDavebalter(r.siteSlug); }}>Edit</Button>
