@@ -74,8 +74,29 @@ function draftStore(op, value) {
         const db = open.result;
         const tx = db.transaction('drafts', op === 'get' ? 'readonly' : 'readwrite');
         const store = tx.objectStore('drafts');
-        const req = op === 'get' ? store.get('current') : op === 'put' ? store.put(value, 'current') : store.delete('current');
-        req.onsuccess = () => resolve(op === 'get' ? req.result : true);
+        // Each story gets its own slot, so two windows on two stories can't overwrite each
+        // other; 'current' only records which story was saved last, for the restore.
+        let req;
+        if (op === 'get') {
+          const ptr = store.get('current');
+          ptr.onerror = () => resolve(null);
+          ptr.onsuccess = () => {
+            const v = ptr.result;
+            if (!v || typeof v !== 'string') { resolve(v || null); return; } // older single-slot draft
+            const r = store.get(v);
+            r.onsuccess = () => resolve(r.result || null);
+            r.onerror = () => resolve(null);
+          };
+          return;
+        }
+        if (op === 'put') {
+          const key = 'story:' + (value.key || 'untitled');
+          store.put(value, key);
+          req = store.put(key, 'current');
+        } else {
+          req = store.delete('current');
+        }
+        req.onsuccess = () => resolve(true);
         req.onerror = () => resolve(null);
       };
     } catch { resolve(null); }
@@ -234,7 +255,7 @@ export default function InstagramSlides() {
     if (!draftReady.current) return;
     const t = setTimeout(() => {
       if (!essay.trim() && !pieceTitle.trim()) { draftStore('del'); return; }
-      draftStore('put', { pieceTitle, essay, styles, insertedImages, publishDate, publishCategory,
+      draftStore('put', { key: publishSlug || slugify(pieceTitle) || 'untitled', pieceTitle, essay, styles, insertedImages, publishDate, publishCategory,
                           publishEngagement, publishSlug, storyFolder, savedAt: new Date().toLocaleString() });
     }, 800);
     return () => clearTimeout(t);
@@ -1138,6 +1159,20 @@ ${slideText}`;
     img.src = dataUrl;
   });
 
+  // Per-slide overrides (custom colors, text scale), keyed by slide index, as one line of
+  // JSON. Kept in the essay so a re-import restores them and the site shows them too.
+  const slideStylesLine = () => {
+    const out = {};
+    Object.entries(styles.slideSpecific || {}).forEach(([i, o]) => {
+      if (Number(i) >= slides.length || !o) return;
+      const keep = {};
+      if (o.colors) keep.colors = o.colors;
+      if (o.scale && String(o.scale) !== '1') keep.scale = o.scale;
+      if (Object.keys(keep).length) out[i] = keep;
+    });
+    return Object.keys(out).length ? JSON.stringify(out) : '';
+  };
+
   const buildEssayMarkdown = (photoAfterStr) => {
     const c = styles.colors;
     const fm = [
@@ -1153,6 +1188,7 @@ ${slideText}`;
       `text: ${hexTriple(c.text)}`,
       `engagement: ${parseInt(publishEngagement, 10) || 0}`,
       `photoAfter: ${photoAfterStr}`,
+      ...(slideStylesLine() ? [`slideStyles: ${slideStylesLine()}`] : []),
       '---',
     ].join('\n');
     return `${fm}\n${essay.trim()}\n`;
@@ -1221,7 +1257,7 @@ ${slideText}`;
           gradientEnd: fm.bot ? tripleToHex(fm.bot) : prev.colors.gradientEnd,
           text: fm.text ? tripleToHex(fm.text) : prev.colors.text,
         },
-        slideSpecific: {},
+        slideSpecific: (() => { try { return fm.slideStyles ? JSON.parse(fm.slideStyles) : {}; } catch { return {}; } })(),
       }));
 
       // Restore photos at their positions. photoAfter: "0=cover.jpg;4=a.jpg,b.jpg" (0 = cover).
@@ -1245,6 +1281,28 @@ ${slideText}`;
     } catch (err) {
       setImportStatus('error: ' + err.message);
     }
+  };
+
+  // After a publish, hand the exact carousel (slides as rendered, photos in place), the
+  // LinkedIn PDF and any drafted posts to the bridge on Dave's Mac. Claude sets up the
+  // Instagram, LinkedIn and Substack posts from there, and Dave approves each one.
+  // No bridge (anyone else using the tool) just means no handoff.
+  const [handoffStatus, setHandoffStatus] = useState('');
+  const handOff = async (url, slug) => {
+    const pages = buildPdfPageOrder();
+    if (!pages.length) return;
+    setHandoffStatus('sending');
+    try {
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'px', format: [1080, 1080] });
+      pages.forEach((p, i) => { if (i > 0) pdf.addPage([1080, 1080]); pdf.addImage(p, /^data:image\/png/.test(p) ? 'PNG' : 'JPEG', 0, 0, 1080, 1080); });
+      const r = await fetch(`${BRIDGE}/handoff`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slug, title: pieceTitle.trim(), date: publishDate, category: publishCategory.trim(),
+                               folder: storyFolder, url, pages, pdf: pdf.output('datauristring'), posts }),
+      });
+      const d = await r.json();
+      setHandoffStatus(d.ok ? `✓ ${d.pages} images + LinkedIn PDF handed off for posting` : 'error: ' + d.error);
+    } catch { setHandoffStatus(''); }
   };
 
   const publishToDavebalter = async (force = false) => {
@@ -1296,6 +1354,7 @@ ${slideText}`;
         setPublishStatus('success');
         setPublishUrl(data.url);
         if (storyFolder) setTimeout(fetchArchiveQueue, 1500);
+        handOff(data.url, publishSlug || slugify(pieceTitle));
       } else {
         if (res.status === 401) { setPublishUnlocked(false); localStorage.removeItem('davebalter_pass'); }
         setPublishStatus('error: ' + (data.error || 'publish failed'));
@@ -2169,6 +2228,9 @@ ${slideText}`;
               )}
               {publishStatus.startsWith('error') && (
                 <p className="mt-3 text-sm text-red-600">{publishStatus.replace(/^error:\s*/, '')}</p>
+              )}
+              {handoffStatus && handoffStatus !== 'sending' && (
+                <p className={`mt-1 text-xs ${handoffStatus.startsWith('error') ? 'text-red-500' : 'text-gray-500'}`}>{handoffStatus.replace(/^error:\s*/, 'handoff failed: ')}</p>
               )}
 
               {/* Write the posts: the week's surrounding copy, drafted in Dave's voice */}
