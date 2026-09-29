@@ -1085,6 +1085,24 @@ ${slideText}`;
     return pages;
   };
 
+  // Send the full carousel (slides + placed photos, in posting order) to a Photos album on
+  // Dave's Mac via the archive bridge; iCloud Photos carries it to his phone for posting.
+  const [phoneStatus, setPhoneStatus] = useState('');
+  const sendToPhone = async () => {
+    const pages = buildPdfPageOrder();
+    if (!pages.length) return;
+    setPhoneStatus('sending');
+    try {
+      const r = await fetch('http://127.0.0.1:4178/photos', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: pieceTitle.trim() || 'story', images: pages }),
+      });
+      const d = await r.json();
+      if (!d.ok) { setPhoneStatus('error: ' + d.error); return; }
+      setPhoneStatus(`✓ ${d.sent} images in Photos → “${d.album}”${pages.length > 20 ? ' — note: Instagram allows 20 per post' : ''}. It’ll be on your phone once iCloud syncs.`);
+    } catch (err) { setPhoneStatus('error: the archive bridge isn’t answering (' + err.message + ')'); }
+  };
+
   const createPdf = async () => {
     const pages = buildPdfPageOrder();
     if (pages.length === 0) return;
@@ -1648,6 +1666,15 @@ ${slideText}`;
             <FileText className="w-5 h-5 mr-2" />
             Create PDF {Object.keys(insertedImages).length > 0 ? '(with photos)' : ''}
           </Button>
+          {archiveQueue && (
+            <Button onClick={sendToPhone} disabled={phoneStatus === 'sending'} variant="outline" className="text-base px-6 py-3">
+              {phoneStatus === 'sending' ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Send className="w-5 h-5 mr-2" />}
+              Send to phone
+            </Button>
+          )}
+          {phoneStatus && phoneStatus !== 'sending' && (
+            <p className={`mt-2 text-xs ${phoneStatus.startsWith('error') ? 'text-red-600' : 'text-gray-500'}`}>{phoneStatus.replace(/^error:\s*/, '')}</p>
+          )}
         </div>
       )}
 
