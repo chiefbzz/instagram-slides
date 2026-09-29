@@ -45,7 +45,11 @@ Here is this week's story${title ? `, titled "${title}"` : ''}. Write the copy t
 
 1. linkedin_posts — two different options for the post that accompanies the story's PDF slide carousel on LinkedIn. Each 3-5 sentences, conversational, not corporate. Must NOT start with the word "I" (LinkedIn buries those). Open with a specific moment or line from the story. End with a question or an invitation to respond. No links (the link goes in the first comment). No hashtags.
 2. linkedin_first_comment — one short line posted as the first comment, pointing to ${SUBSTACK} where a story like this arrives every Tuesday.
-3. instagram_caption — for the Instagram slide carousel. 2-4 short sentences in the same voice, then a line pointing to the link in bio. At most 3 relevant hashtags at the very end, or none.
+3. instagram_caption — for the Instagram slide carousel. NEVER a summary of the story: it is a build TO the story, a wry setup that makes someone swipe, and it gives nothing away (no plot, no costs, no ending). Short lines, each on its own line, deadpan and a little absurd, ending on a sideways punchline. For the tone, here is one Dave wrote for a story about flat tires:
+Flat tires are fun
+The process of fixing them even more so
+Except when you have tattoos, then you're good. So get a tattoo, that's what I came here to say
+No hashtags, no "link in bio" unless it lands naturally.
 4. substack_subtitle — one line under the title on Substack, under 110 characters. A hook drawn from the story, not a summary.
 5. newsletter_share — 1-3 sentences to accompany the story when it's published as an issue of his LinkedIn newsletter "Mostly True Stories". Must not start with "I".
 
