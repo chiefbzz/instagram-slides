@@ -1140,6 +1140,98 @@ ${slideText}`;
     setShowThanks(true);
   };
 
+  // --- Vertical export (9:16) for Reels / TikTok / Shorts --------------------
+  // Each slide and photo becomes a 1080x1920 frame: the square centred on the story's
+  // own gradient, which keeps it clear of the platforms' buttons and captions. Adds an
+  // end card and a reading script cut near 55 seconds at a slide break (the point
+  // where a short video should stop and send people to the full story), with a
+  // per-frame duration for CapCut. The words are Dave's, verbatim; only markup is removed.
+  const [verticalStatus, setVerticalStatus] = useState('');
+  const plainSlide = (t) => (t || '').replace(/\{[^}]*\}/g, '').replace(/\^\^\^/g, '').replace(/>{2,}/g, '')
+    .replace(/[*~]/g, '').replace(/[ \t]+/g, ' ').replace(/\n{2,}/g, '\n').trim();
+  const slideColorsAt = (i) => ({ ...styles.colors, ...((styles.slideSpecific[i] || {}).colors || {}) });
+  const verticalFrame = (src, colors) => new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas'); c.width = 1080; c.height = 1920;
+      const g = c.getContext('2d');
+      const grad = g.createLinearGradient(0, 0, 0, 1920);
+      grad.addColorStop(0, colors.gradientStart); grad.addColorStop(0.5, colors.gradientMiddle); grad.addColorStop(1, colors.gradientEnd);
+      g.fillStyle = grad; g.fillRect(0, 0, 1080, 1920);
+      const side = Math.min(img.width, img.height);
+      g.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 420, 1080, 1080);
+      resolve(c.toDataURL('image/jpeg', 0.92));
+    };
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+  const verticalEndCard = (colors) => {
+    const c = document.createElement('canvas'); c.width = 1080; c.height = 1920;
+    const g = c.getContext('2d');
+    const grad = g.createLinearGradient(0, 0, 0, 1920);
+    grad.addColorStop(0, colors.gradientStart); grad.addColorStop(0.5, colors.gradientMiddle); grad.addColorStop(1, colors.gradientEnd);
+    g.fillStyle = grad; g.fillRect(0, 0, 1080, 1920);
+    g.fillStyle = colors.text; g.textAlign = 'center';
+    const font = styles.fontFamily || 'Georgia';
+    g.font = `600 64px "${font}", Georgia, serif`; g.fillText('The rest of the story', 540, 820);
+    const words = (pieceTitle.trim() || 'Mostly True Stories').split(' '); let line = '', y = 930;
+    g.font = `italic 56px "${font}", Georgia, serif`;
+    words.forEach((w) => { const t = line ? line + ' ' + w : w; if (g.measureText(t).width > 900) { g.fillText(line, 540, y); line = w; y += 70; } else line = t; });
+    if (line) g.fillText(line, 540, y);
+    g.font = `500 44px "${font}", Georgia, serif`; g.fillText('link in bio', 540, y + 140);
+    return c.toDataURL('image/jpeg', 0.92);
+  };
+  const exportVertical = async () => {
+    if (!slideImages.length) return;
+    setVerticalStatus('building');
+    const WPM = 150, TARGET = 55;
+    const order = [];
+    for (let i = 0; i < slides.length; i++) {
+      (insertedImages[i] || []).forEach((src) => order.push({ kind: 'photo', src, colors: slideColorsAt(i) }));
+      if (slideImages[i]) order.push({ kind: 'slide', src: slideImages[i], text: plainSlide(slides[i]), colors: slideColorsAt(i) });
+    }
+    (insertedImages[slides.length] || []).forEach((src) => order.push({ kind: 'photo', src, colors: slideColorsAt(slides.length - 1) }));
+    const frames = [], rows = []; let secs = 0, cutAt = null, read = [];
+    for (let k = 0; k < order.length; k++) {
+      const f = await verticalFrame(order[k].src, order[k].colors);
+      if (!f) continue;
+      frames.push(f);
+      const words = order[k].kind === 'slide' ? order[k].text.split(/\s+/).filter(Boolean).length : 0;
+      const dur = order[k].kind === 'slide' ? Math.max(2.5, Math.round((words / WPM) * 60 * 10) / 10) : 2.5;
+      // stop before a slide that would run the read past 60s (always read at least two slides)
+      if (cutAt === null && read.length >= 2 && secs + dur > 60) cutAt = frames.length - 1;
+      if (cutAt === null) { secs += dur; if (order[k].kind === 'slide') read.push(order[k].text); }
+      rows.push(`| ${String(frames.length).padStart(2, '0')} | ${order[k].kind} | ${dur}s | ${order[k].kind === 'slide' ? order[k].text.split('\n')[0].slice(0, 60) : '(photo)'} |`);
+      if (cutAt === null && secs >= TARGET && read.length >= 2) cutAt = frames.length;
+    }
+    frames.push(verticalEndCard(slideColorsAt(0)));
+    rows.push(`| ${String(frames.length).padStart(2, '0')} | end card | 3s | The rest of the story, link in bio |`);
+    const firstLine = (order.find((o) => o.kind === 'slide')?.text || '').split('\n')[0];
+    const script = [
+      `# ${pieceTitle.trim() || 'Story'}: short video script`, '',
+      `Frames: 1080x1920 in this folder. Read to the cut, then show the end card.`, '',
+      `## Hook (first 2 seconds, on screen and spoken)`, `A: ${firstLine}`, `B: (pick the story's strangest line; test A vs B)`, '',
+      `## Read this (${Math.round(secs)}s at ${WPM} wpm, cut after frame ${cutAt || frames.length - 1})`, '', read.join('\n\n'), '',
+      `## Frame timings`, '| # | kind | seconds | starts with |', '|--|--|--|--|', ...rows, '',
+      `## Caption`, posts?.instagram_caption || '(run Write the posts, or write one that builds to the story)', '',
+      `## CapCut`, `1. New project, 9:16. Import the frames in order, set each to its seconds above.`,
+      `2. Drop in your voice recording. Text > Auto captions. Keep captions above the bottom 400px.`,
+      `3. Trim to the cut frame and add the end card. Export 1080p, 30fps.`, '',
+    ].join('\n');
+    const slug = publishSlug || slugify(pieceTitle) || 'story';
+    try {
+      const r = await fetch(`${BRIDGE}/vertical`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slug, frames, script }) });
+      const d = await r.json();
+      if (!d.ok) throw new Error(d.error);
+      setVerticalStatus(`✓ ${d.frames} vertical frames + script saved to ~/chief/social/${slug}/vertical`);
+    } catch {
+      frames.forEach((f, i) => setTimeout(() => { const a = document.createElement('a'); a.href = f; a.download = `${slug}-vertical-${String(i + 1).padStart(2, '0')}.jpg`; a.click(); }, i * 200));
+      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([script], { type: 'text/markdown' })); a.download = `${slug}-vertical-script.md`;
+      setTimeout(() => a.click(), frames.length * 200 + 200);
+      setVerticalStatus(`✓ downloading ${frames.length} vertical frames + script`);
+    }
+  };
+
   // --- Publish to davebalter.com -------------------------------------------
   const hexTriple = (hex) => `${parseInt(hex.slice(1, 3), 16)},${parseInt(hex.slice(3, 5), 16)},${parseInt(hex.slice(5, 7), 16)}`;
 
@@ -1725,11 +1817,18 @@ ${slideText}`;
             <FileText className="w-5 h-5 mr-2" />
             Create PDF {Object.keys(insertedImages).length > 0 ? '(with photos)' : ''}
           </Button>
+          <Button onClick={exportVertical} disabled={verticalStatus === 'building'} variant="outline" className="text-base px-6 py-3" title="9:16 frames + a reading script for Reels, TikTok and Shorts (CapCut-ready)">
+            {verticalStatus === 'building' ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : null}
+            Vertical 9:16
+          </Button>
           {archiveQueue && (
             <Button onClick={sendToPhone} disabled={phoneStatus === 'sending'} variant="outline" className="text-base px-6 py-3">
               {phoneStatus === 'sending' ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Send className="w-5 h-5 mr-2" />}
               Send to phone
             </Button>
+          )}
+          {verticalStatus && verticalStatus !== 'building' && (
+            <p className={`mt-2 text-xs ${verticalStatus.startsWith('error') ? 'text-red-600' : 'text-gray-500'}`}>{verticalStatus.replace(/^error:\s*/, '')}</p>
           )}
           {phoneStatus && phoneStatus !== 'sending' && (
             <p className={`mt-2 text-xs ${phoneStatus.startsWith('error') ? 'text-red-600' : 'text-gray-500'}`}>{phoneStatus.replace(/^error:\s*/, '')}</p>
