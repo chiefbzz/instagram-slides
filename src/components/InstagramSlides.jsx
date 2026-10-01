@@ -1147,6 +1147,7 @@ ${slideText}`;
   // where a short video should stop and send people to the full story), with a
   // per-frame duration for CapCut. The words are Dave's, verbatim; only markup is removed.
   const [verticalStatus, setVerticalStatus] = useState('');
+  const [reelPlan, setReelPlan] = useState(null);   // frames to read, from the last vertical export
   const plainSlide = (t) => (t || '').replace(/\{[^}]*\}/g, '').replace(/\^\^\^/g, '').replace(/>{2,}/g, '')
     .replace(/[*~]/g, '').replace(/[ \t]+/g, ' ').replace(/\n{2,}/g, '\n').trim();
   const slideColorsAt = (i) => ({ ...styles.colors, ...((styles.slideSpecific[i] || {}).colors || {}) });
@@ -1191,11 +1192,12 @@ ${slideText}`;
       if (slideImages[i]) order.push({ kind: 'slide', src: slideImages[i], text: plainSlide(slides[i]), colors: slideColorsAt(i) });
     }
     (insertedImages[slides.length] || []).forEach((src) => order.push({ kind: 'photo', src, colors: slideColorsAt(slides.length - 1) }));
-    const frames = [], rows = []; let secs = 0, cutAt = null, read = [];
+    const frames = [], rows = [], reelFrames = []; let secs = 0, cutAt = null, read = [];
     for (let k = 0; k < order.length; k++) {
       const f = await verticalFrame(order[k].src, order[k].colors);
       if (!f) continue;
       frames.push(f);
+      if (cutAt === null) reelFrames.push({ n: frames.length, kind: order[k].kind, text: order[k].kind === 'slide' ? order[k].text : '' });
       const words = order[k].kind === 'slide' ? order[k].text.split(/\s+/).filter(Boolean).length : 0;
       const dur = order[k].kind === 'slide' ? Math.max(2.5, Math.round((words / WPM) * 60 * 10) / 10) : 2.5;
       // stop before a slide that would run the read past 60s (always read at least two slides)
@@ -1224,6 +1226,8 @@ ${slideText}`;
       const d = await r.json();
       if (!d.ok) throw new Error(d.error);
       setVerticalStatus(`✓ ${d.frames} vertical frames + script saved to ~/chief/social/${slug}/vertical`);
+      // frames past the cut were pushed to reelFrames before the cut was known; trim them
+      setReelPlan({ slug, frames: cutAt ? reelFrames.filter((f) => f.n <= cutAt) : reelFrames });
     } catch {
       frames.forEach((f, i) => setTimeout(() => { const a = document.createElement('a'); a.href = f; a.download = `${slug}-vertical-${String(i + 1).padStart(2, '0')}.jpg`; a.click(); }, i * 200));
       const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([script], { type: 'text/markdown' })); a.download = `${slug}-vertical-script.md`;
@@ -1231,6 +1235,67 @@ ${slideText}`;
       setVerticalStatus(`✓ downloading ${frames.length} vertical frames + script`);
     }
   };
+
+  // --- Record reel: teleprompter + voice → finished MP4 on Dave's Mac ---------
+  // Dave reads each frame aloud and presses Space to move on; the presses time the cuts.
+  // Audio is captured as plain 16-bit WAV (every Apple tool reads it), sent to the
+  // bridge with the timings, and assembled there into vertical/reel.mp4.
+  const [rec, setRec] = useState(null); // null | {i, t0, marks, state, msg}
+  const recRef = useRef(null);
+  const startReel = async () => {
+    if (!reelPlan) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: true } });
+      const ctx = new AudioContext();
+      const src = ctx.createMediaStreamSource(stream);
+      const proc = ctx.createScriptProcessor(4096, 1, 1);
+      const chunks = [];
+      proc.onaudioprocess = (e) => chunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+      src.connect(proc); proc.connect(ctx.destination);
+      recRef.current = { stream, ctx, proc, chunks };
+      setRec({ i: 0, t0: performance.now(), marks: [], state: 'recording' });
+    } catch (err) { setRec({ state: 'error', msg: 'Microphone not available: ' + err.message }); }
+  };
+  const wavFrom = (chunks, rate) => {
+    const len = chunks.reduce((n, c) => n + c.length, 0);
+    const buf = new ArrayBuffer(44 + len * 2), v = new DataView(buf);
+    const w = (o, str) => [...str].forEach((ch, k) => v.setUint8(o + k, ch.charCodeAt(0)));
+    w(0, 'RIFF'); v.setUint32(4, 36 + len * 2, true); w(8, 'WAVE'); w(12, 'fmt ');
+    v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+    w(36, 'data'); v.setUint32(40, len * 2, true);
+    let o = 44; chunks.forEach((c) => c.forEach((x) => { v.setInt16(o, Math.max(-1, Math.min(1, x)) * 0x7fff, true); o += 2; }));
+    return new Blob([buf], { type: 'audio/wav' });
+  };
+  const finishReel = async (marks, t0) => {
+    const r = recRef.current; if (!r) return;
+    r.proc.disconnect(); r.stream.getTracks().forEach((t) => t.stop());
+    const rate = r.ctx.sampleRate; await r.ctx.close();
+    const wav = wavFrom(r.chunks, rate);
+    const audio = await new Promise((res) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(wav); });
+    const edges = [t0, ...marks];
+    const timings = reelPlan.frames.map((f, k) => ({ n: f.n, seconds: Math.max(0.8, ((edges[k + 1] ?? edges[k] + 2500) - edges[k]) / 1000) }));
+    setRec({ state: 'building' });
+    try {
+      const resp = await fetch(`${BRIDGE}/reel`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ slug: reelPlan.slug, audio, timings }) });
+      const d = await resp.json();
+      if (!d.ok) throw new Error(d.error);
+      setRec({ state: 'done', msg: `✓ ${d.seconds}s reel saved: ~/chief/social/${reelPlan.slug}/vertical/reel.mp4. Tell Claude to post it.` });
+    } catch (err) { setRec({ state: 'error', msg: 'Could not build the reel: ' + err.message }); }
+  };
+  const nextReel = useCallback(() => {
+    setRec((cur) => {
+      if (!cur || cur.state !== 'recording') return cur;
+      const marks = [...cur.marks, performance.now()];
+      if (cur.i + 1 >= reelPlan.frames.length) { setTimeout(() => finishReel(marks, cur.t0), 0); return { ...cur, marks, state: 'stopping' }; }
+      return { ...cur, i: cur.i + 1, marks };
+    });
+  }, [reelPlan]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!rec || rec.state !== 'recording') return;
+    const onKey = (e) => { if (e.code === 'Space') { e.preventDefault(); nextReel(); } if (e.code === 'Escape') { recRef.current?.stream.getTracks().forEach((t) => t.stop()); setRec(null); } };
+    window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey);
+  }, [rec, nextReel]);
 
   // --- Publish to davebalter.com -------------------------------------------
   const hexTriple = (hex) => `${parseInt(hex.slice(1, 3), 16)},${parseInt(hex.slice(3, 5), 16)},${parseInt(hex.slice(5, 7), 16)}`;
@@ -1826,6 +1891,33 @@ ${slideText}`;
               {phoneStatus === 'sending' ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Send className="w-5 h-5 mr-2" />}
               Send to phone
             </Button>
+          )}
+          {reelPlan && (
+            <Button onClick={() => setRec({ state: 'ready' })} variant="outline" className="text-base px-6 py-3" title="Read the story aloud; Claude's Mac turns it into a finished reel">
+              Record reel
+            </Button>
+          )}
+          {rec && (rec.state === 'done' || rec.state === 'error') && (
+            <p className={`mt-2 text-xs ${rec.state === 'error' ? 'text-red-600' : 'text-gray-500'}`}>{rec.msg}</p>
+          )}
+          {rec && ['ready', 'recording', 'stopping', 'building'].includes(rec.state) && reelPlan && (
+            <div className="fixed inset-0 z-50 flex flex-col items-center justify-center p-8" style={{ background: '#111' , color: '#f2f0ea' }}>
+              <div className="text-xs uppercase tracking-widest mb-6" style={{ color: '#9a978d' }}>
+                {rec.state === 'ready' && 'Read each frame aloud. Press Space for the next one. Esc cancels.'}
+                {rec.state === 'recording' && `Recording · frame ${rec.i + 1} of ${reelPlan.frames.length} · Space = next`}
+                {rec.state === 'stopping' && 'Finishing…'}
+                {rec.state === 'building' && 'Building your reel on the Mac…'}
+              </div>
+              <div className="max-w-3xl text-center whitespace-pre-line" style={{ fontSize: '2rem', lineHeight: 1.4, fontFamily: styles.fontFamily }}>
+                {rec.state === 'recording' ? (reelPlan.frames[rec.i].kind === 'photo' ? '(photo: pause, then Space)' : reelPlan.frames[rec.i].text)
+                  : rec.state === 'ready' ? reelPlan.frames[0].text : ''}
+              </div>
+              <div className="mt-10 flex gap-3">
+                {rec.state === 'ready' && <Button onClick={startReel} className="text-base px-6 py-3">Start recording</Button>}
+                {rec.state === 'recording' && <Button onClick={nextReel} className="text-base px-6 py-3">{rec.i + 1 >= reelPlan.frames.length ? 'Finish' : 'Next (Space)'}</Button>}
+                {['ready', 'recording'].includes(rec.state) && <Button variant="outline" onClick={() => { recRef.current?.stream.getTracks().forEach((t) => t.stop()); setRec(null); }} className="text-base px-6 py-3">Cancel</Button>}
+              </div>
+            </div>
           )}
           {verticalStatus && verticalStatus !== 'building' && (
             <p className={`mt-2 text-xs ${verticalStatus.startsWith('error') ? 'text-red-600' : 'text-gray-500'}`}>{verticalStatus.replace(/^error:\s*/, '')}</p>
