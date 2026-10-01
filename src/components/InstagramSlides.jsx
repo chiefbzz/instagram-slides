@@ -2302,12 +2302,14 @@ ${slideText}`;
                       </p>
                       {archiveStory.slides.length > 0 && (
                         <details open>
-                          <summary className="text-xs cursor-pointer" style={{ color: '#8a8880' }}>Your original slides ({archiveStory.slides.length})</summary>
+                          <summary className="text-xs cursor-pointer" style={{ color: '#8a8880' }}>Your original slides ({archiveStory.slides.filter((x) => !x.alt).length}{archiveStory.slides.some((x) => x.alt) ? ', plus alternate takes to choose from' : ''})</summary>
                           <div className="mt-2 grid grid-cols-4 gap-2">
                             {archiveStory.slides.map((sl, i) => (
                               <button key={sl.file} onClick={() => setPreview({ show: true, image: sl.img })} className="text-left">
                                 <img src={sl.img} alt={`original ${i + 1}`} className="w-full aspect-square object-cover rounded border" />
-                                <span className="text-[10px]" style={{ color: '#b3b0a8' }}>{i + 1} · {sl.file}</span>
+                                <span className="text-[10px]" style={{ color: sl.alt ? '#b07a1e' : '#b3b0a8' }}>
+                                  {sl.alt ? `alt take of slide ${sl.alt}` : archiveStory.slides.slice(0, i + 1).filter((x) => !x.alt).length} · {sl.file}
+                                </span>
                               </button>
                             ))}
                           </div>
