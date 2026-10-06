@@ -2096,6 +2096,24 @@ ${slideText}`;
                     Reset
                   </Button>
                 )}
+                {styles.slideSpecific[index]?.colors && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    title="Swap this slide's background and text colors"
+                    onClick={() => {
+                      const c = styles.slideSpecific[index].colors;
+                      const newSlideSpecific = { ...styles.slideSpecific };
+                      newSlideSpecific[index] = {
+                        ...newSlideSpecific[index],
+                        colors: { gradientStart: c.text, gradientMiddle: c.text, gradientEnd: c.text, text: c.gradientMiddle },
+                      };
+                      setStyles({ ...styles, slideSpecific: newSlideSpecific });
+                    }}
+                  >
+                    ⇄ Flip
+                  </Button>
+                )}
               </div>
               {styles.slideSpecific[index]?.colors && (
                 <div className="mb-4 grid grid-cols-4 gap-2">
@@ -2104,24 +2122,41 @@ ${slideText}`;
                     ['gradientMiddle', 'Mid'],
                     ['gradientEnd', 'Bot'],
                     ['text', 'Text'],
-                  ].map(([key, label]) => (
-                    <div key={key}>
-                      <label className="block text-xs mb-1">{label}</label>
-                      <Input
-                        type="color"
-                        value={styles.slideSpecific[index].colors[key]}
-                        onChange={e => {
-                          const newSlideSpecific = { ...styles.slideSpecific };
-                          newSlideSpecific[index] = {
-                            ...newSlideSpecific[index],
-                            colors: { ...newSlideSpecific[index].colors, [key]: e.target.value }
-                          };
-                          setStyles({ ...styles, slideSpecific: newSlideSpecific });
-                        }}
-                        className="h-8"
-                      />
-                    </div>
-                  ))}
+                  ].map(([key, label]) => {
+                    // A color swatch plus a typed hex box: the Mac color wheel makes exact colors hard to hit.
+                    const setSlideColor = (value) => {
+                      const newSlideSpecific = { ...styles.slideSpecific };
+                      newSlideSpecific[index] = {
+                        ...newSlideSpecific[index],
+                        colors: { ...newSlideSpecific[index].colors, [key]: value }
+                      };
+                      setStyles({ ...styles, slideSpecific: newSlideSpecific });
+                    };
+                    return (
+                      <div key={key}>
+                        <label className="block text-xs mb-1">{label}</label>
+                        <Input
+                          type="color"
+                          value={styles.slideSpecific[index].colors[key]}
+                          onChange={e => setSlideColor(e.target.value)}
+                          className="h-8"
+                        />
+                        <Input
+                          type="text"
+                          aria-label={`${label} color code`}
+                          defaultValue={styles.slideSpecific[index].colors[key]}
+                          key={styles.slideSpecific[index].colors[key]}
+                          onBlur={e => {
+                            const v = e.target.value.trim().replace(/^([0-9a-f]{6})$/i, '#$1');
+                            if (/^#[0-9a-f]{6}$/i.test(v)) setSlideColor(v.toLowerCase());
+                            else e.target.value = styles.slideSpecific[index].colors[key];
+                          }}
+                          onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                          className="h-7 mt-1 text-xs font-mono px-1"
+                        />
+                      </div>
+                    );
+                  })}
                 </div>
               )}
 
