@@ -148,10 +148,10 @@ function prepublishChecks({ essay, pieceTitle, publishDate, publishCategory }) {
 // The thank-you card rotates through these on each visit.
 // Hooks are starting points — tighten them in your own voice anytime.
 const FEATURED = [
-  { title: 'The Pool Guy', hook: 'He came to clean the pool. He stayed to rearrange my life.', url: 'https://buttondown.com/balter/archive/the-pool-guy/' },
-  { title: 'The Hand', hook: 'The smallest gesture, and everything it was quietly holding.', url: 'https://buttondown.com/balter/archive/the-hand/' },
-  { title: 'Jew to Jew', hook: 'On belonging, discomfort, and the things we only say to our own.', url: 'https://buttondown.com/balter/archive/jew-to-jew/' },
-  { title: 'The Impossible Why', hook: 'my friend blair died at 47...', url: 'https://buttondown.com/balter/archive/the-impossible-why/' },
+  { title: 'The Pool Guy', hook: 'He came to clean the pool. He stayed to rearrange my life.', url: 'https://davebalter.com/essay/the-pool-guy' },
+  { title: 'The Hand', hook: 'The smallest gesture, and everything it was quietly holding.', url: 'https://davebalter.com/essay/the-hand' },
+  { title: 'Jew to Jew', hook: 'On belonging, discomfort, and the things we only say to our own.', url: 'https://davebalter.com/essay/jew-to-jew' },
+  { title: 'The Impossible Why', hook: 'my friend blair died at 47...', url: 'https://davebalter.com/essay/the-impossible-why' },
 ];
 
 export default function InstagramSlides() {
