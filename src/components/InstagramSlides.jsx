@@ -1476,9 +1476,17 @@ ${slideText}`;
       // Map inserted photos -> files + photoAfter (position key = "after slide N"; 0 = cover)
       const photos = [];
       const parts = [];
-      const positions = Object.keys(insertedImages).map(Number).sort((a, b) => a - b);
+      // A spot typed beside an archive photo but never Added still counts: place it now.
+      const images = { ...insertedImages };
+      let pending = false;
+      for (const ph of archiveStory?.photos || []) {
+        const n = parseInt(photoSpot[ph.file], 10);
+        if (ph.img && !Number.isNaN(n) && n >= 0) { images[n] = [...(images[n] || []), ph.img]; pending = true; }
+      }
+      if (pending) { setInsertedImages(images); setPhotoSpot({}); }
+      const positions = Object.keys(images).map(Number).sort((a, b) => a - b);
       for (const pos of positions) {
-        const imgs = insertedImages[pos] || [];
+        const imgs = images[pos] || [];
         const names = [];
         for (let idx = 0; idx < imgs.length; idx++) {
           const src = imgs[idx];
@@ -2358,7 +2366,7 @@ ${slideText}`;
                               <div key={ph.file} className="flex items-center gap-3">
                                 {ph.img ? <img src={ph.img} alt="" className="w-12 h-12 object-cover rounded border" /> : <div className="w-12 h-12 rounded border bg-white" />}
                                 <span className="flex-1 text-xs truncate" style={{ color: '#6b6860' }}>{ph.file}</span>
-                                <Input type="number" min="0" placeholder="after slide" value={photoSpot[ph.file] || ''} onChange={e => setPhotoSpot(prev => ({ ...prev, [ph.file]: e.target.value }))} className="w-28 h-8 text-xs" />
+                                <Input type="number" min="0" placeholder="after slide" value={photoSpot[ph.file] || ''} onChange={e => setPhotoSpot(prev => ({ ...prev, [ph.file]: e.target.value }))} onKeyDown={e => { if (e.key === 'Enter') placeArchivePhoto(ph); }} className="w-28 h-8 text-xs" />
                                 <Button size="sm" variant="outline" onClick={() => placeArchivePhoto(ph)} disabled={!ph.img}>Add</Button>
                               </div>
                             ))}
