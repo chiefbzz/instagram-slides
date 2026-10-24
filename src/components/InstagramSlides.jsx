@@ -219,6 +219,7 @@ export default function InstagramSlides() {
   const [archiveShowAll, setArchiveShowAll] = useState(false);
   const [archiveStory, setArchiveStory] = useState(null); // the loaded story's originals + photos
   const [archiveStatus, setArchiveStatus] = useState('');
+  const [archiveStyleStatus, setArchiveStyleStatus] = useState(''); // font/styling match for a loaded archive story
   const [photoSpot, setPhotoSpot] = useState({});         // photo file -> "after slide" input
   // Catalog: every story across the site, Substack and the archive (from the bridge's /catalog)
   const [catalogOpen, setCatalogOpen] = useState(false);
@@ -291,8 +292,59 @@ export default function InstagramSlides() {
         gradientStart: tripleToHex(s.palette.top), gradientMiddle: tripleToHex(s.palette.mid),
         gradientEnd: tripleToHex(s.palette.bot), text: tripleToHex(s.palette.ink) }, slideSpecific: {} }));
       setArchiveStory(s);
+      matchArchiveStyle(s);
       setArchiveStatus(s.desktopReadable ? '' : 'error: the Desktop folder isn’t readable right now (macOS permission) — text loaded, no images');
     } catch (err) { setArchiveStatus('error: ' + err.message); }
+  };
+
+  // Claude reads the original slide images and returns the closest font plus the phrases that
+  // were italic, bold, colored or indented. Markup is added only around phrases found
+  // word-for-word in the draft; the words themselves are never changed.
+  const matchArchiveStyle = async (s) => {
+    const originals = (s.slides || []).filter(x => !x.alt && x.img).map(x => x.img);
+    if (!originals.length) { setArchiveStyleStatus(''); return; }
+    if (!publishPass) { setArchiveStyleStatus('Unlock publishing to match the font and styling from your original slides.'); return; }
+    setArchiveStyleStatus('Matching font and styling to your original slides…');
+    const segs = s.text.split('///');
+    const idx = segs.map((x, i) => (x.trim() ? i : -1)).filter(i => i >= 0); // slide n → raw segment
+    try {
+      const res = await fetch('/api/match-style', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ passphrase: publishPass, slides: originals, texts: idx.map(i => segs[i].trim()), fonts }),
+      });
+      const d = await res.json();
+      if (!d.success) { setArchiveStyleStatus('Couldn’t match the styling: ' + (d.error || 'unknown error')); return; }
+      let placed = 0, skipped = 0;
+      for (const sp of d.spans || []) {
+        const i = idx[sp.slide - 1];
+        const t = (sp.text || '').trim();
+        if (i === undefined || !t || /[*{}~]/.test(t) || !segs[i].includes(t)) { skipped++; continue; }
+        let w = sp.bold ? `**${t}**` : sp.italic ? `*${t}*` : t;
+        if (/^#[0-9a-fA-F]{6}$/.test(sp.color || '')) w = `{${sp.color.toUpperCase()}}${w}{/}`;
+        if (w === t) { skipped++; continue; }
+        segs[i] = segs[i].replace(t, w);
+        placed++;
+      }
+      let indented = 0;
+      for (const ind of d.indents || []) {
+        const i = idx[ind.slide - 1];
+        const start = (ind.lineStart || '').trim();
+        if (i === undefined || !start) continue;
+        const lines = segs[i].split('\n');
+        const li = lines.findIndex(l => !l.startsWith('>') && l.replace(/^[*{]+(#[0-9a-fA-F]{6}\})?\**/, '').startsWith(start));
+        if (li < 0) continue;
+        lines[li] = '>'.repeat(Math.min(Math.max(ind.level || 1, 1), 3)) + lines[li];
+        segs[i] = lines.join('\n');
+        indented++;
+      }
+      const text = segs.join('///');
+      setEssay(text);
+      setSlides(text.split('///').map(x => x.trim()).filter(Boolean));
+      if (d.font) setStyles(prev => ({ ...prev, fontFamily: d.font }));
+      setArchiveStyleStatus(`Matched to your originals: ${d.font || 'font unchanged'}, ${placed} styled phrase${placed === 1 ? '' : 's'}, ${indented} indented line${indented === 1 ? '' : 's'}`
+        + (skipped ? ` (${skipped} skipped: not found word-for-word)` : '') + '. Your words are unchanged. Check it against the originals below.');
+    } catch (err) { setArchiveStyleStatus('Couldn’t match the styling: ' + err.message); }
   };
 
   const openCatalog = async () => {
@@ -2343,6 +2395,7 @@ ${slideText}`;
                         {archiveStory.substack && <> — already on Substack as “{archiveStory.substack}”, so it won’t need importing</>}.
                         {' '}Pick a Category, check the text against your originals, then Generate Slides and Publish.
                       </p>
+                      {archiveStyleStatus && <p className="text-xs mb-2" style={{ color: '#6b6860' }}>{archiveStyleStatus}</p>}
                       {archiveStory.slides.length > 0 && (
                         <details open>
                           <summary className="text-xs cursor-pointer" style={{ color: '#8a8880' }}>Your original slides ({archiveStory.slides.filter((x) => !x.alt).length}{archiveStory.slides.some((x) => x.alt) ? ', plus alternate takes to choose from' : ''})</summary>
